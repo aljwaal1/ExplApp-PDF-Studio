@@ -36,6 +36,9 @@ const money=value=>{
 const dateRx=/(?:\d{1,2}[\/\-.]\d{1,2}(?:[\/\-.]\d{2,4})?|\d{4}[\/\-.]\d{1,2}[\/\-.]\d{1,2})/;
 const chequeRx=/(?:شيك|الشـيك|رقم\s*الشيك|chq|cheque|check)\s*[:#\-]?\s*([A-Z0-9\-\/]{3,})/i;
 const referenceRx=/(?:مرجع|المرجع|رقم\s*المستند|مستند|reference|ref)\s*[:#\-]?\s*([A-Z0-9\-\/]{3,})/i;
+const debitDirectionRx=/^(?:D|DR|DB|DEBIT|مدين|سحب)$/i;
+const creditDirectionRx=/^(?:C|CR|CD|CREDIT|دائن|إيداع|ايداع)$/i;
+const normalizeDirection=value=>{const text=clean(value);if(debitDirectionRx.test(text))return'debit';if(creditDirectionRx.test(text))return'credit';return''};
 
 function safeName(name){return String(name||'bank-statement').replace(/\.pdf$/i,'').replace(/[\\/:*?"<>|]/g,'_')}
 function groupRows(items){
@@ -52,7 +55,7 @@ function inferColumns(rows){
 }
 function nearestColumn(x,columns){let best=0,dist=Infinity;columns.forEach((column,index)=>{const current=Math.abs(column-x);if(current<dist){best=index;dist=current}});return best}
 const rowText=row=>logicalCells(row).map(cell=>cell.text).join(' ');
-const headerKeys=['التاريخ','date','البيان','description','مدين','debit','دائن','credit','المبلغ','amount','الرصيد','balance','شيك','مرجع'];
+const headerKeys=['التاريخ','date','البيان','description','مدين','debit','دائن','credit','المبلغ','amount','الرصيد','balance','شيك','مرجع','نوع الحركة','نوع العملية','transaction type','dr/cr','d/c'];
 function headerScore(row){const text=rowText(row).toLowerCase();return headerKeys.filter(key=>text.includes(key)).length}
 function detectHeader(rows){return rows.findIndex(row=>headerScore(row)>=2)}
 function classifyHeader(text){
@@ -61,6 +64,7 @@ function classifyHeader(text){
   if(/شيك|chq|cheque|check/.test(value))return'cheque';
   if(/مرجع|مستند|reference|ref/.test(value))return'reference';
   if(/بيان|وصف|description|details|narration/.test(value))return'description';
+  if(/نوع\s*(?:الحركة|العملية)|transaction\s*type|dr\s*\/\s*cr|d\s*\/\s*c/.test(value))return'direction';
   if(/مدين|debit|سحب/.test(value))return'debit';
   if(/دائن|credit|إيداع/.test(value))return'credit';
   if(/رصيد|balance/.test(value))return'balance';
@@ -90,7 +94,7 @@ function buildRecords(rows,pageNo){
     const hasDate=dateRx.test(text),nums=row.map(cell=>money(cell.text)).filter(value=>value!==''&&Math.abs(value)<1e15);
     const cheque=(text.match(chequeRx)||[])[1]||'',reference=(text.match(referenceRx)||[])[1]||'';
     if(!hasDate&&nums.length===0&&text.length<160){if(out.length)appendContinuation(out[out.length-1],text);else leadingContinuation=clean([leadingContinuation,text].filter(Boolean).join(' '));continue}
-    const record={page:pageNo,date:'',reference,cheque,description:'',amount:'',debit:'',credit:'',balance:'',confidence:'متوسط'};
+    const record={page:pageNo,date:'',reference,cheque,description:'',amount:'',debit:'',credit:'',balance:'',direction:'',confidence:'متوسط'};
     const buckets={};row.forEach(cell=>{const index=nearestColumn(cell.x,columns);(buckets[index]??=[]).push(cell)});
     for(const [index,cells] of Object.entries(buckets)){
       const value=clean(logicalCells(cells).map(cell=>cell.text).join(' ')),type=map[index];
@@ -98,10 +102,11 @@ function buildRecords(rows,pageNo){
       else if(type==='cheque')record.cheque=record.cheque||value;
       else if(type==='reference')record.reference=record.reference||value;
       else if(type==='description')record.description=value;
+      else if(type==='direction')record.direction=normalizeDirection(value);
       else if(['amount','debit','credit','balance'].includes(type))record[type]=money(value);
     }
     if(!record.date)record.date=(text.match(dateRx)||[])[0]||'';
-    if(!record.description){const monetaryTokens=row.filter(cell=>money(cell.text)!=='').map(cell=>cell.text);record.description=clean(text.replace(dateRx,'').replace(chequeRx,'').replace(referenceRx,'').split(' ').filter(token=>!monetaryTokens.includes(token)).join(' '))}
+    if(!record.description){const monetaryTokens=row.filter(cell=>money(cell.text)!=='').map(cell=>cell.text);record.description=clean(text.replace(dateRx,'').replace(chequeRx,'').replace(referenceRx,'').split(' ').filter(token=>!monetaryTokens.includes(token)&&!normalizeDirection(token)).join(' '))}
     if(!record.cheque)record.cheque=(record.description.match(chequeRx)||[])[1]||'';
     if(leadingContinuation){appendContinuation(record,leadingContinuation);leadingContinuation=''}
     if(Object.keys(map).length<2){
@@ -111,6 +116,7 @@ function buildRecords(rows,pageNo){
       else if(amounts.length===1)record.amount=amounts[0];
       record.confidence='منخفض';
     }else record.confidence='مرتفع';
+    if(record.amount!==''&&record.direction)record.amount=record.direction==='debit'?-Math.abs(record.amount):Math.abs(record.amount);
     if(record.date||record.description||nums.length)out.push(record);
   }
   if(leadingContinuation&&out.length)appendContinuation(out[out.length-1],leadingContinuation);
