@@ -3,6 +3,10 @@
 
 const arabicDigits=value=>String(value??'').replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d));
 const clean=value=>arabicDigits(value).replace(/\s+/g,' ').trim();
+const arabicChars=value=>(String(value??'').match(/[\u0600-\u06FF]/g)||[]).length;
+const latinChars=value=>(String(value??'').match(/[A-Za-z]/g)||[]).length;
+const isRtlRow=row=>{const text=row.map(cell=>cell.text).join(' ');return arabicChars(text)>latinChars(text)};
+const logicalCells=row=>[...row].sort((a,b)=>isRtlRow(row)?b.x-a.x:a.x-b.x);
 const dateOnlyRx=/^(?:\d{1,2}[\/\-.]\d{1,2}(?:[\/\-.]\d{2,4})?|\d{4}[\/\-.]\d{1,2}[\/\-.]\d{1,2})$/;
 const normalizeSeparators=value=>{
   let text=clean(value).replace(/[٬،]/g,',').replace(/[٫]/g,'.').replace(/\s+/g,'');
@@ -47,7 +51,7 @@ function inferColumns(rows){
   return groups.filter(group=>group.n>=2).sort((a,b)=>a.x-b.x).map(group=>group.x);
 }
 function nearestColumn(x,columns){let best=0,dist=Infinity;columns.forEach((column,index)=>{const current=Math.abs(column-x);if(current<dist){best=index;dist=current}});return best}
-const rowText=row=>row.map(cell=>cell.text).join(' ');
+const rowText=row=>logicalCells(row).map(cell=>cell.text).join(' ');
 const headerKeys=['التاريخ','date','البيان','description','مدين','debit','دائن','credit','المبلغ','amount','الرصيد','balance','شيك','مرجع'];
 function headerScore(row){const text=rowText(row).toLowerCase();return headerKeys.filter(key=>text.includes(key)).length}
 function detectHeader(rows){return rows.findIndex(row=>headerScore(row)>=2)}
@@ -87,9 +91,9 @@ function buildRecords(rows,pageNo){
     const cheque=(text.match(chequeRx)||[])[1]||'',reference=(text.match(referenceRx)||[])[1]||'';
     if(!hasDate&&nums.length===0&&text.length<160){if(out.length)appendContinuation(out[out.length-1],text);else leadingContinuation=clean([leadingContinuation,text].filter(Boolean).join(' '));continue}
     const record={page:pageNo,date:'',reference,cheque,description:'',amount:'',debit:'',credit:'',balance:'',confidence:'متوسط'};
-    const buckets={};row.forEach(cell=>{const index=nearestColumn(cell.x,columns);(buckets[index]??=[]).push(cell.text)});
-    for(const [index,parts] of Object.entries(buckets)){
-      const value=clean(parts.join(' ')),type=map[index];
+    const buckets={};row.forEach(cell=>{const index=nearestColumn(cell.x,columns);(buckets[index]??=[]).push(cell)});
+    for(const [index,cells] of Object.entries(buckets)){
+      const value=clean(logicalCells(cells).map(cell=>cell.text).join(' ')),type=map[index];
       if(type==='date')record.date=(value.match(dateRx)||[])[0]||value;
       else if(type==='cheque')record.cheque=record.cheque||value;
       else if(type==='reference')record.reference=record.reference||value;
