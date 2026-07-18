@@ -1,4 +1,4 @@
-const CACHE='explapp-pdf-studio-v18';
+const CACHE='explapp-pdf-studio-v19';
 const CORE=['./','./index.html','./manifest.webmanifest','./icon.svg','./book-fix.js','./core/pdf-studio-utils.js','./modules/pdf-excel-core.js','./ui/excel-preview.js','./modules/pdf-word-docx.js','./modules/images-to-pdf.js','./modules/pdf-to-html.js','./modules/pdf-markdown.js','./modules/pdf-search-advanced.js','./modules/pdf-ocr-advanced.js','./excel-tool.js'];
 
 function patchHtml(html){
