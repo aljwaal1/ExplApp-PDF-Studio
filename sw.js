@@ -1,10 +1,11 @@
-const CACHE='explapp-pdf-studio-v7';
-const CORE=['./','./index.html','./manifest.webmanifest','./icon.svg','./book-fix.js','./modules/pdf-excel-core.js','./excel-tool.js'];
+const CACHE='explapp-pdf-studio-v8';
+const CORE=['./','./index.html','./manifest.webmanifest','./icon.svg','./book-fix.js','./modules/pdf-excel-core.js','./ui/excel-preview.js','./excel-tool.js'];
 
 function patchHtml(html){
  let patched=html;
  if(!patched.includes('book-fix.js'))patched=patched.replace('</body>','<script src="./book-fix.js"></script></body>');
  if(!patched.includes('modules/pdf-excel-core.js'))patched=patched.replace('</body>','<script src="./modules/pdf-excel-core.js"></script></body>');
+ if(!patched.includes('ui/excel-preview.js'))patched=patched.replace('</body>','<script src="./ui/excel-preview.js"></script></body>');
  if(!patched.includes('excel-tool.js'))patched=patched.replace('</body>','<script src="./excel-tool.js"></script></body>');
  return patched;
 }
