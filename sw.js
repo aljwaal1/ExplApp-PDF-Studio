@@ -1,5 +1,5 @@
-const CACHE='explapp-pdf-studio-v14';
-const CORE=['./','./index.html','./manifest.webmanifest','./icon.svg','./book-fix.js','./modules/pdf-excel-core.js','./ui/excel-preview.js','./modules/pdf-word-docx.js','./modules/images-to-pdf.js','./modules/pdf-to-html.js','./excel-tool.js'];
+const CACHE='explapp-pdf-studio-v15';
+const CORE=['./','./index.html','./manifest.webmanifest','./icon.svg','./book-fix.js','./modules/pdf-excel-core.js','./ui/excel-preview.js','./modules/pdf-word-docx.js','./modules/images-to-pdf.js','./modules/pdf-to-html.js','./modules/pdf-markdown.js','./excel-tool.js'];
 
 function patchHtml(html){
  let patched=html;
@@ -9,6 +9,7 @@ function patchHtml(html){
  if(!patched.includes('modules/pdf-word-docx.js'))patched=patched.replace('</body>','<script src="./modules/pdf-word-docx.js"></script></body>');
  if(!patched.includes('modules/images-to-pdf.js'))patched=patched.replace('</body>','<script src="./modules/images-to-pdf.js"></script></body>');
  if(!patched.includes('modules/pdf-to-html.js'))patched=patched.replace('</body>','<script src="./modules/pdf-to-html.js"></script></body>');
+ if(!patched.includes('modules/pdf-markdown.js'))patched=patched.replace('</body>','<script src="./modules/pdf-markdown.js"></script></body>');
  if(!patched.includes('excel-tool.js'))patched=patched.replace('</body>','<script src="./excel-tool.js"></script></body>');
  return patched;
 }
