@@ -10,7 +10,7 @@ function addOptions(){
   const box=document.createElement('div');
   box.id='excelFinancialOpt';
   box.className='hidden';
-  box.innerHTML='<div class="row"><div class="field"><label>نوع الملف</label><select id="excelSource"><option value="auto">اكتشاف تلقائي</option><option value="text">PDF نصي</option><option value="image">PDF مصور OCR عربي</option></select></div><div class="field"><label>نوع الكشف</label><select id="excelProfile"><option value="bank">كشف بنك / مالي</option><option value="general">جدول عام</option></select></div></div><div class="note">يدعم رقم الشيك من عمود مستقل أو من البيان أو من سطر مرتبط بالحركة.</div>';
+  box.innerHTML='<div class="row"><div class="field"><label>نوع الملف</label><select id="excelSource"><option value="auto">اكتشاف تلقائي</option><option value="text">PDF نصي</option><option value="image">PDF مصور OCR عربي</option></select></div><div class="field"><label>نوع الكشف</label><select id="excelProfile"><option value="bank">كشف بنك / مالي</option><option value="general">جدول عام</option></select></div></div><div class="note">بعد الاستخراج ستظهر شاشة مراجعة قابلة للتعديل قبل تنزيل Excel.</div>';
   run.parentElement.insertAdjacentElement('beforebegin',box);
 }
 
@@ -20,7 +20,7 @@ async function detectMode(pdf){
   return content.items.map(item=>item.str).join('').trim().length>20?'text':'image';
 }
 
-async function runExcelConversion(){
+async function extractExcelRecords(){
   const core=window.ExplAppPdfExcelCore;
   if(!core)throw Error('محرك PDF إلى Excel غير محمل');
   const file=document.querySelector('#files')?.files?.[0];
@@ -30,7 +30,16 @@ async function runExcelConversion(){
   let mode=document.querySelector('#excelSource')?.value||'auto';
   if(mode==='auto')mode=await detectMode(pdf);
   const records=mode==='image'?await core.extractOcrRows(pdf,'ara+eng'):await core.extractTextRows(pdf);
-  core.exportXlsx(records,file.name);
+  if(!records.length)throw Error('لم يتم اكتشاف حركات قابلة للمراجعة');
+  return {records,fileName:file.name};
+}
+
+async function runExcelConversion(){
+  const core=window.ExplAppPdfExcelCore;
+  const preview=window.ExplAppExcelPreview;
+  if(!preview)throw Error('شاشة معاينة Excel غير محملة');
+  const {records,fileName}=await extractExcelRecords();
+  preview.show(records,{fileName,onExport:(edited,name)=>core.exportXlsx(edited,name)});
 }
 
 function init(){
@@ -46,7 +55,7 @@ function init(){
   button.type='button';
   button.className='tool';
   button.dataset.excelEntry='true';
-  button.innerHTML='<b>📗 PDF إلى Excel</b><span>كشوف عربية وأرقام شيكات</span>';
+  button.innerHTML='<b>📗 PDF إلى Excel</b><span>استخراج، مراجعة، ثم تنزيل</span>';
   button.onclick=()=>{
     tablesButton.click();
     excelMode=true;
@@ -57,7 +66,7 @@ function init(){
     const title=document.querySelector('#dropTitle');
     const hint=document.querySelector('#dropHint');
     if(title)title.textContent='اختر كشف PDF لتحويله إلى Excel';
-    if(hint)hint.textContent='نصي أو مصور — عربي — مع رقم المرجع والشيك';
+    if(hint)hint.textContent='نصي أو مصور — عربي — مع مراجعة قبل التنزيل';
   };
   tools.insertBefore(button,tablesButton);
 
