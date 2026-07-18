@@ -5,6 +5,7 @@ const arabicDigits=value=>String(value??'')
   .replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d))
   .replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d));
 const clean=value=>arabicDigits(value).replace(/\s+/g,' ').trim();
+const dateOnlyRx=/^(?:\d{1,2}[\/\-.]\d{1,2}(?:[\/\-.]\d{2,4})?|\d{4}[\/\-.]\d{1,2}[\/\-.]\d{1,2})$/;
 const normalizeSeparators=value=>{
   let text=clean(value)
     .replace(/[٬،]/g,',')
@@ -25,7 +26,7 @@ const normalizeSeparators=value=>{
 };
 const money=value=>{
   const raw=clean(value).toUpperCase();
-  if(!raw)return'';
+  if(!raw||dateOnlyRx.test(raw))return'';
   const debit=/\bDR\b|مدين|سحب/.test(raw);
   const credit=/\bCR\b|دائن|إيداع/.test(raw);
   const trailingMinus=/-\s*$/.test(raw);
