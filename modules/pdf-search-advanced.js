@@ -2,23 +2,23 @@
 'use strict';
 
 let searchMode=false;
-const $=selector=>document.querySelector(selector);
-const clean=value=>String(value??'').replace(/\s+/g,' ').trim();
-
-function setProgress(percent,message){
+const utils=window.PDFStudioUtils||{};
+const $=utils.query||((selector)=>document.querySelector(selector));
+const clean=utils.clean||((value)=>String(value??'').replace(/\s+/g,' ').trim());
+const setProgress=utils.setProgress||function(percent,message){
   const box=$('#progress'),bar=$('#bar'),msg=$('#msg');
   if(box)box.style.display='block';
   if(bar)bar.style.width=`${Math.max(0,Math.min(100,percent))}%`;
   if(msg)msg.textContent=message||'';
-}
-function hideProgress(){const box=$('#progress');if(box)box.style.display='none'}
-function escapeHtml(value){return String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]))}
-function csvCell(value){return `"${String(value??'').replace(/"/g,'""')}"`}
-function download(data,name,type){
+};
+const hideProgress=utils.hideProgress||function(){const box=$('#progress');if(box)box.style.display='none'};
+const escapeHtml=utils.escapeHtml||((value)=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])));
+const csvCell=utils.csvCell||((value)=>`"${String(value??'').replace(/"/g,'""')}"`);
+const download=utils.download||function(data,name,type){
   const url=URL.createObjectURL(new Blob([data],{type}));
   const anchor=document.createElement('a');anchor.href=url;anchor.download=name;document.body.appendChild(anchor);anchor.click();anchor.remove();
   setTimeout(()=>URL.revokeObjectURL(url),5000);
-}
+};
 
 function buildMatcher(query,mode,caseSensitive){
   if(!query)throw Error('اكتب كلمة أو عبارة للبحث');
