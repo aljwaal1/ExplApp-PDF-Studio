@@ -70,6 +70,18 @@ function classifyHeader(text){
   return'';
 }
 
+function appendContinuation(record,text){
+  if(!record||!text)return false;
+  const cheque=(text.match(chequeRx)||[])[1]||'';
+  const reference=(text.match(referenceRx)||[])[1]||'';
+  record.cheque=record.cheque||cheque;
+  record.reference=record.reference||reference;
+  const description=clean(text.replace(chequeRx,'').replace(referenceRx,''));
+  if(description)record.description=clean(`${record.description} ${description}`);
+  if(record.confidence==='مرتفع')record.confidence='متوسط';
+  return true;
+}
+
 function buildRecords(rows,pageNo){
   if(!rows.length)return[];
   const headerIndex=detectHeader(rows);
@@ -90,7 +102,7 @@ function buildRecords(rows,pageNo){
     });
   }
   const out=[];
-  let pending='';
+  let leadingContinuation='';
   for(const row of dataRows){
     const text=rowText(row);
     if(!text)continue;
@@ -98,8 +110,9 @@ function buildRecords(rows,pageNo){
     const nums=row.map(cell=>money(cell.text)).filter(value=>value!==''&&Math.abs(value)<1e15);
     const cheque=(text.match(chequeRx)||[])[1]||'';
     const reference=(text.match(referenceRx)||[])[1]||'';
-    if(!hasDate&&nums.length===0&&text.length<90){
-      pending=clean([pending,text].filter(Boolean).join(' '));
+    if(!hasDate&&nums.length===0&&text.length<160){
+      if(out.length)appendContinuation(out[out.length-1],text);
+      else leadingContinuation=clean([leadingContinuation,text].filter(Boolean).join(' '));
       continue;
     }
     const record={page:pageNo,date:'',reference,cheque,description:'',debit:'',credit:'',balance:'',confidence:'متوسط'};
@@ -120,11 +133,9 @@ function buildRecords(rows,pageNo){
       record.description=clean(text.replace(dateRx,'').replace(chequeRx,'').replace(referenceRx,'').split(' ').filter(token=>!monetaryTokens.includes(token)).join(' '));
     }
     if(!record.cheque)record.cheque=(record.description.match(chequeRx)||[])[1]||'';
-    if(pending){
-      record.cheque=record.cheque||(pending.match(chequeRx)||[])[1]||'';
-      record.reference=record.reference||(pending.match(referenceRx)||[])[1]||'';
-      record.description=clean(`${pending} ${record.description}`);
-      pending='';
+    if(leadingContinuation){
+      appendContinuation(record,leadingContinuation);
+      leadingContinuation='';
     }
     if(Object.keys(map).length<2){
       const amounts=nums.slice(-3);
@@ -135,6 +146,7 @@ function buildRecords(rows,pageNo){
     }else record.confidence='مرتفع';
     if(record.date||record.description||nums.length)out.push(record);
   }
+  if(leadingContinuation&&out.length)appendContinuation(out[out.length-1],leadingContinuation);
   return out;
 }
 
