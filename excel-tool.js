@@ -42,13 +42,19 @@ async function runExcelConversion(){
   preview.show(records,{fileName,onExport:(edited,name)=>core.exportXlsx(edited,name)});
 }
 
+function setExcelUi(active){
+  excelMode=active;
+  document.querySelector('#excelFinancialOpt')?.classList.toggle('hidden',!active);
+  document.querySelector('#options')?.classList.toggle('hidden',active);
+}
+
 function init(){
   const tools=document.querySelector('.tools');
   if(!tools)return;
-  tools.querySelector('[data-t="compare"]')?.remove();
+  tools.querySelector('[data-tool="compare"]')?.remove();
   addOptions();
   if(tools.querySelector('[data-excel-entry="true"]'))return;
-  const tablesButton=tools.querySelector('[data-t="tables"]');
+  const tablesButton=tools.querySelector('[data-tool="tables"]');
   if(!tablesButton)return;
 
   const button=document.createElement('button');
@@ -58,11 +64,9 @@ function init(){
   button.innerHTML='<b>📗 PDF إلى Excel</b><span>استخراج، مراجعة، ثم تنزيل</span>';
   button.onclick=()=>{
     tablesButton.click();
-    excelMode=true;
+    setExcelUi(true);
     document.querySelectorAll('.tool').forEach(item=>item.classList.remove('active'));
     button.classList.add('active');
-    document.querySelector('#tableOpt')?.classList.add('hidden');
-    document.querySelector('#excelFinancialOpt')?.classList.remove('hidden');
     const title=document.querySelector('#dropTitle');
     const hint=document.querySelector('#dropHint');
     if(title)title.textContent='اختر كشف PDF لتحويله إلى Excel';
@@ -71,11 +75,12 @@ function init(){
   tools.insertBefore(button,tablesButton);
 
   for(const other of tools.querySelectorAll('.tool:not([data-excel-entry="true"])')){
-    other.addEventListener('click',()=>{
-      excelMode=false;
-      document.querySelector('#excelFinancialOpt')?.classList.add('hidden');
-    });
+    other.addEventListener('click',()=>setExcelUi(false));
   }
+
+  document.querySelector('#reset')?.addEventListener('click',()=>{
+    if(excelMode)setTimeout(()=>setExcelUi(true),0);
+  });
 
   const run=document.querySelector('#run');
   run.addEventListener('click',async event=>{
