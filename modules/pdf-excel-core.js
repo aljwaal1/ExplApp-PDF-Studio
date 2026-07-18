@@ -24,13 +24,15 @@ const normalizeSeparators=value=>{
   return text;
 };
 const money=value=>{
-  let normalized=normalizeSeparators(value).toUpperCase();
-  if(!normalized)return'';
-  const debit=/\bDR\b|مدين|سحب/.test(normalized);
-  const credit=/\bCR\b|دائن|إيداع/.test(normalized);
-  const trailingMinus=/-$/.test(normalized);
-  const parentheses=/\([^)]*\)/.test(normalized);
-  normalized=normalized.replace(/\b(?:CR|DR)\b|مدين|دائن|سحب|إيداع/g,'').replace(/[^0-9.()+\-]/g,'');
+  const raw=clean(value).toUpperCase();
+  if(!raw)return'';
+  const debit=/(?:^|[^A-Z])DR(?:$|[^A-Z])|مدين|سحب/.test(raw);
+  const credit=/(?:^|[^A-Z])CR(?:$|[^A-Z])|دائن|إيداع/.test(raw);
+  const trailingMinus=/-\s*$/.test(raw);
+  const parentheses=/\([^)]*\)/.test(raw);
+  let normalized=normalizeSeparators(raw)
+    .replace(/(?:^|[^A-Z])(?:CR|DR)(?=$|[^A-Z])|مدين|دائن|سحب|إيداع/g,'')
+    .replace(/[^0-9.()+\-]/g,'');
   const numeric=Number(normalized.replace(/[()+\-]/g,'')||NaN);
   if(!Number.isFinite(numeric))return'';
   return parentheses||trailingMinus||debit&&!credit?-numeric:numeric;
