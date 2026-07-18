@@ -1,4 +1,4 @@
-const CACHE='explapp-pdf-studio-v5';
+const CACHE='explapp-pdf-studio-v6';
 const CORE=['./','./index.html','./manifest.webmanifest','./icon.svg','./book-fix.js','./excel-tool.js'];
 
 function patchHtml(html){
