@@ -1,4 +1,4 @@
-const CACHE='explapp-pdf-studio-v21';
+const CACHE='explapp-pdf-studio-v22';
 const CORE=['./','./index.html','./manifest.webmanifest','./icon.svg','./core/pdf-studio-utils.js','./modules/pdf-excel-core.js','./ui/excel-preview.js','./modules/pdf-word-docx.js','./modules/images-to-pdf.js','./modules/pdf-to-html.js','./modules/pdf-markdown.js','./modules/pdf-search-advanced.js','./modules/pdf-ocr-advanced.js','./modules/pdf-tables-advanced.js','./modules/pdf-existing-tools-enhanced.js','./excel-tool.js'];
 
 function patchHtml(html){
@@ -22,9 +22,19 @@ self.addEventListener('install',event=>event.waitUntil(
  caches.open(CACHE).then(cache=>cache.addAll(CORE)).then(()=>self.skipWaiting())
 ));
 
-self.addEventListener('activate',event=>event.waitUntil(
- caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim())
-));
+self.addEventListener('activate',event=>event.waitUntil((async()=>{
+ await Promise.all((await caches.keys()).filter(key=>key!==CACHE).map(key=>caches.delete(key)));
+ const windows=await self.clients.matchAll({type:'window',includeUncontrolled:true});
+ await self.clients.claim();
+ await Promise.all(windows.map(async client=>{
+  try{
+   const url=new URL(client.url);
+   if(url.searchParams.get('pwa')===CACHE)return;
+   url.searchParams.set('pwa',CACHE);
+   await client.navigate(url.href);
+  }catch{}
+ }));
+})()));
 
 self.addEventListener('fetch',event=>{
  if(event.request.method!=='GET')return;
