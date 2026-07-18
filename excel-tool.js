@@ -51,7 +51,6 @@ function setExcelUi(active){
 function init(){
   const tools=document.querySelector('.tools');
   if(!tools)return;
-  tools.querySelector('[data-tool="compare"]')?.remove();
   addOptions();
   if(tools.querySelector('[data-excel-entry="true"]'))return;
   const tablesButton=tools.querySelector('[data-tool="tables"]');
