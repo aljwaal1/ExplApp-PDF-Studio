@@ -5,12 +5,35 @@ const arabicDigits=value=>String(value??'')
   .replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d))
   .replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d));
 const clean=value=>arabicDigits(value).replace(/\s+/g,' ').trim();
+const normalizeSeparators=value=>{
+  let text=clean(value)
+    .replace(/[٬،]/g,',')
+    .replace(/[٫]/g,'.')
+    .replace(/\s+/g,'');
+  const comma=text.lastIndexOf(','),dot=text.lastIndexOf('.');
+  if(comma>=0&&dot>=0){
+    const decimal=Math.max(comma,dot);
+    text=[...text].filter((char,index)=>char!==','&&char!=='.'||index===decimal).join('').replace(',', '.');
+  }else if(comma>=0){
+    const decimals=text.length-comma-1;
+    text=decimals===3&&/^[-+()]?\d{1,3}(?:,\d{3})+$/.test(text)?text.replace(/,/g,''):text.replace(',', '.');
+  }else if((text.match(/\./g)||[]).length>1){
+    const last=text.lastIndexOf('.');
+    text=[...text].filter((char,index)=>char!=='.'||index===last).join('');
+  }
+  return text;
+};
 const money=value=>{
-  const normalized=clean(value).replace(/[^0-9.,()\-]/g,'').replace(/,/g,'');
+  let normalized=normalizeSeparators(value).toUpperCase();
   if(!normalized)return'';
-  const numeric=Number(normalized.replace(/[()]/g,'').replace(/^-/,'')||NaN);
+  const debit=/\bDR\b|مدين|سحب/.test(normalized);
+  const credit=/\bCR\b|دائن|إيداع/.test(normalized);
+  const trailingMinus=/-$/.test(normalized);
+  const parentheses=/\([^)]*\)/.test(normalized);
+  normalized=normalized.replace(/\b(?:CR|DR)\b|مدين|دائن|سحب|إيداع/g,'').replace(/[^0-9.()+\-]/g,'');
+  const numeric=Number(normalized.replace(/[()+\-]/g,'')||NaN);
   if(!Number.isFinite(numeric))return'';
-  return normalized.includes('(')||normalized.startsWith('-')?-numeric:numeric;
+  return parentheses||trailingMinus||debit&&!credit?-numeric:numeric;
 };
 const dateRx=/(?:\d{1,2}[\/\-.]\d{1,2}(?:[\/\-.]\d{2,4})?|\d{4}[\/\-.]\d{1,2}[\/\-.]\d{1,2})/;
 const chequeRx=/(?:شيك|الشـيك|رقم\s*الشيك|chq|cheque|check)\s*[:#\-]?\s*([A-Z0-9\-\/]{3,})/i;
