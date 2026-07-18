@@ -1,5 +1,5 @@
-const CACHE='explapp-pdf-studio-v19';
-const CORE=['./','./index.html','./manifest.webmanifest','./icon.svg','./book-fix.js','./core/pdf-studio-utils.js','./modules/pdf-excel-core.js','./ui/excel-preview.js','./modules/pdf-word-docx.js','./modules/images-to-pdf.js','./modules/pdf-to-html.js','./modules/pdf-markdown.js','./modules/pdf-search-advanced.js','./modules/pdf-ocr-advanced.js','./excel-tool.js'];
+const CACHE='explapp-pdf-studio-v20';
+const CORE=['./','./index.html','./manifest.webmanifest','./icon.svg','./book-fix.js','./core/pdf-studio-utils.js','./modules/pdf-excel-core.js','./ui/excel-preview.js','./modules/pdf-word-docx.js','./modules/images-to-pdf.js','./modules/pdf-to-html.js','./modules/pdf-markdown.js','./modules/pdf-search-advanced.js','./modules/pdf-ocr-advanced.js','./modules/pdf-tables-advanced.js','./modules/pdf-existing-tools-enhanced.js','./excel-tool.js'];
 
 function patchHtml(html){
  let patched=html;
@@ -13,6 +13,8 @@ function patchHtml(html){
  if(!patched.includes('modules/pdf-markdown.js'))patched=patched.replace('</body>','<script src="./modules/pdf-markdown.js"></script></body>');
  if(!patched.includes('modules/pdf-search-advanced.js'))patched=patched.replace('</body>','<script src="./modules/pdf-search-advanced.js"></script></body>');
  if(!patched.includes('modules/pdf-ocr-advanced.js'))patched=patched.replace('</body>','<script src="./modules/pdf-ocr-advanced.js"></script></body>');
+ if(!patched.includes('modules/pdf-tables-advanced.js'))patched=patched.replace('</body>','<script src="./modules/pdf-tables-advanced.js"></script></body>');
+ if(!patched.includes('modules/pdf-existing-tools-enhanced.js'))patched=patched.replace('</body>','<script src="./modules/pdf-existing-tools-enhanced.js"></script></body>');
  if(!patched.includes('excel-tool.js'))patched=patched.replace('</body>','<script src="./excel-tool.js"></script></body>');
  return patched;
 }
