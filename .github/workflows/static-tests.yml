@@ -22,3 +22,5 @@ jobs:
         run: find . -type f -name '*.js' -not -path './.git/*' -print0 | xargs -0 -n1 node --check
       - name: Run core utility tests
         run: node tests/core-utils.node.mjs
+      - name: Run PWA integration tests
+        run: node tests/integration.node.mjs
