@@ -1,0 +1,17 @@
+{
+  "name": "ExplApp PDF Studio",
+  "short_name": "PDF Studio",
+  "description": "أدوات عربية محلية لإدارة وتحويل والبحث داخل ملفات PDF",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f4f7fb",
+  "theme_color": "#2859d8",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    {"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
+  ]
+}
