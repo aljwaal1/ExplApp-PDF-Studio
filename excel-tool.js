@@ -1,51 +1,39 @@
 (()=>{
-  'use strict';
-
-  function init(){
-    const tools=document.querySelector('.tools');
-    if(!tools)return;
-
-    // إزالة أداة المقارنة حسب طلب المستخدم.
-    const compareButton=tools.querySelector('[data-t="compare"]');
-    if(compareButton)compareButton.remove();
-
-    // منع تكرار الإضافة بعد تحديثات PWA.
-    if(tools.querySelector('[data-excel-entry="true"]'))return;
-
-    const tablesButton=tools.querySelector('[data-t="tables"]');
-    if(!tablesButton)return;
-
-    const excelButton=document.createElement('button');
-    excelButton.type='button';
-    excelButton.className='tool';
-    excelButton.dataset.excelEntry='true';
-    excelButton.innerHTML='<b>📗 PDF إلى Excel</b><span>جداول عربية وبيانات مالية</span>';
-
-    excelButton.addEventListener('click',()=>{
-      // نستخدم محرك الجداول الحالي مع فرض إخراج Excel.
-      tablesButton.click();
-      const format=document.querySelector('#tableFmt');
-      if(format)format.value='xlsx';
-
-      document.querySelectorAll('.tool').forEach(button=>button.classList.remove('active'));
-      excelButton.classList.add('active');
-
-      const title=document.querySelector('#dropTitle');
-      const hint=document.querySelector('#dropHint');
-      if(title)title.textContent='اختر ملف PDF لتحويله إلى Excel';
-      if(hint)hint.textContent='يدعم العربية والجداول المالية النصية — المعالجة محلية';
-    });
-
-    tools.insertBefore(excelButton,tablesButton);
-
-    // توضيح وظيفة زر الجداول بعد فصل أداة Excel عنه.
-    const span=tablesButton.querySelector('span');
-    if(span)span.textContent='اكتشاف ومعاينة الجداول';
-  }
-
-  if(document.readyState==='loading'){
-    document.addEventListener('DOMContentLoaded',init,{once:true});
-  }else{
-    init();
-  }
+'use strict';
+let excelMode=false;
+const arabicDigits=s=>String(s||'').replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d));
+const clean=s=>arabicDigits(s).replace(/\s+/g,' ').trim();
+const money=s=>{const v=clean(s).replace(/[^0-9.,()\-]/g,'').replace(/,/g,'');if(!v)return'';const n=Number(v.replace(/[()]/g,'').replace(/^-/,'')||NaN);return Number.isFinite(n)?(v.includes('(')||v.startsWith('-')?-n:n):''};
+const dateRx=/(?:\d{1,2}[\/\-.]\d{1,2}(?:[\/\-.]\d{2,4})?|\d{4}[\/\-.]\d{1,2}[\/\-.]\d{1,2})/;
+const chequeRx=/(?:شيك|الشـيك|رقم\s*الشيك|chq|cheque|check)\s*[:#\-]?\s*([A-Z0-9\-\/]{3,})/i;
+const referenceRx=/(?:مرجع|المرجع|رقم\s*المستند|مستند|reference|ref)\s*[:#\-]?\s*([A-Z0-9\-\/]{3,})/i;
+function safeName(name){return String(name||'bank-statement').replace(/\.pdf$/i,'').replace(/[\\/:*?"<>|]/g,'_')}
+function groupRows(items){const sorted=items.filter(x=>clean(x.str)).map(x=>({text:clean(x.str),x:x.transform?.[4]||0,y:x.transform?.[5]||0,w:x.width||0})).sort((a,b)=>b.y-a.y||a.x-b.x);const rows=[];for(const item of sorted){let row=rows.find(r=>Math.abs(r.y-item.y)<=4);if(!row){row={y:item.y,cells:[]};rows.push(row)}row.cells.push(item)}return rows.sort((a,b)=>b.y-a.y).map(r=>r.cells.sort((a,b)=>a.x-b.x))}
+function inferColumns(rows){const xs=[];rows.slice(0,40).forEach(r=>r.forEach(c=>xs.push(c.x)));xs.sort((a,b)=>a-b);const groups=[];for(const x of xs){let g=groups.find(v=>Math.abs(v.x-x)<18);if(g){g.x=(g.x*g.n+x)/(g.n+1);g.n++}else groups.push({x,n:1})}return groups.filter(g=>g.n>=2).sort((a,b)=>a.x-b.x).map(g=>g.x)}
+function nearestColumn(x,cols){let best=0,dist=Infinity;cols.forEach((c,i)=>{const d=Math.abs(c-x);if(d<dist){best=i;dist=d}});return best}
+function rowText(row){return row.map(c=>c.text).join(' ')}
+function detectHeader(rows){const keys=['التاريخ','date','البيان','description','مدين','debit','دائن','credit','الرصيد','balance','شيك','مرجع'];return rows.findIndex(r=>keys.filter(k=>rowText(r).toLowerCase().includes(k)).length>=2)}
+function classifyHeader(text){text=text.toLowerCase();if(/تاريخ|date/.test(text))return'date';if(/شيك|chq|cheque|check/.test(text))return'cheque';if(/مرجع|مستند|reference|ref/.test(text))return'reference';if(/بيان|وصف|description|details|narration/.test(text))return'description';if(/مدين|debit|سحب/.test(text))return'debit';if(/دائن|credit|إيداع/.test(text))return'credit';if(/رصيد|balance/.test(text))return'balance';return''}
+function buildRecords(rows,pageNo){if(!rows.length)return[];const headerIndex=detectHeader(rows);const dataRows=headerIndex>=0?rows.slice(headerIndex+1):rows;let cols=inferColumns(dataRows);if(cols.length<3){const all=dataRows.flat();const min=Math.min(...all.map(x=>x.x)),max=Math.max(...all.map(x=>x.x));cols=[min,min+(max-min)*.18,min+(max-min)*.58,min+(max-min)*.75,max]}
+const map={};if(headerIndex>=0){rows[headerIndex].forEach(cell=>{const type=classifyHeader(cell.text);if(type)map[nearestColumn(cell.x,cols)]=type})}
+const out=[];let pending='';for(const row of dataRows){const text=rowText(row);if(!text)continue;const hasDate=dateRx.test(text);const nums=row.map(c=>money(c.text)).filter(v=>v!==''&&Math.abs(v)<1e15);const ch=(text.match(chequeRx)||[])[1]||'';const ref=(text.match(referenceRx)||[])[1]||'';
+if(!hasDate&&nums.length===0&&text.length<90){pending=clean([pending,text].filter(Boolean).join(' '));continue}
+const rec={page:pageNo,date:'',reference:ref,cheque:ch,description:'',debit:'',credit:'',balance:'',confidence:'متوسط'};
+const buckets={};row.forEach(cell=>{const i=nearestColumn(cell.x,cols);(buckets[i]??=[]).push(cell.text)});
+for(const [i,arr] of Object.entries(buckets)){const value=clean(arr.join(' '));const type=map[i];if(type==='date')rec.date=(value.match(dateRx)||[])[0]||value;else if(type==='cheque')rec.cheque=rec.cheque||value;else if(type==='reference')rec.reference=rec.reference||value;else if(type==='description')rec.description=value;else if(['debit','credit','balance'].includes(type))rec[type]=money(value)}
+if(!rec.date)rec.date=(text.match(dateRx)||[])[0]||'';
+if(!rec.description){const monetaryTokens=row.filter(c=>money(c.text)!=='').map(c=>c.text);rec.description=clean(text.replace(dateRx,'').replace(chequeRx,'').replace(referenceRx,'').split(' ').filter(x=>!monetaryTokens.includes(x)).join(' '))}
+if(!rec.cheque)rec.cheque=(rec.description.match(chequeRx)||[])[1]||'';
+if(pending){const pch=(pending.match(chequeRx)||[])[1]||'';const pref=(pending.match(referenceRx)||[])[1]||'';rec.cheque=rec.cheque||pch;rec.reference=rec.reference||pref;rec.description=clean(pending+' '+rec.description);pending=''}
+if(!map || Object.keys(map).length<2){const amounts=nums.slice(-3);if(amounts.length===3){[rec.debit,rec.credit,rec.balance]=amounts}else if(amounts.length===2){[rec.debit,rec.balance]=amounts}else if(amounts.length===1)rec.balance=amounts[0];rec.confidence='منخفض'}else rec.confidence='مرتفع';
+if(rec.date||rec.description||nums.length)out.push(rec)}return out}
+async function extractTextRows(pdf){const all=[];for(let n=1;n<=pdf.numPages;n++){const p=await pdf.getPage(n),tc=await p.getTextContent();all.push(...buildRecords(groupRows(tc.items),n))}return all}
+async function extractOcrRows(pdf,lang){if(!window.Tesseract)throw Error('محرك OCR غير متوفر');const worker=await Tesseract.createWorker(lang);const all=[];try{for(let n=1;n<=pdf.numPages;n++){const p=await pdf.getPage(n),vp=p.getViewport({scale:2}),c=document.createElement('canvas');c.width=vp.width;c.height=vp.height;await p.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;const r=await worker.recognize(c);const items=(r.data.words||[]).map(w=>({str:w.text,transform:[1,0,0,1,w.bbox.x0,c.height-w.bbox.y0],width:w.bbox.x1-w.bbox.x0}));all.push(...buildRecords(groupRows(items),n))}}finally{await worker.terminate()}return all}
+function exportXlsx(records,name){if(!records.length)throw Error('لم يتم اكتشاف حركات قابلة للتحويل');const rows=records.map(r=>({'الصفحة':r.page,'التاريخ':r.date,'رقم المرجع':r.reference,'رقم الشيك':r.cheque,'البيان':r.description,'مدين':r.debit,'دائن':r.credit,'الرصيد':r.balance,'الثقة':r.confidence}));const ws=XLSX.utils.json_to_sheet(rows,{header:['الصفحة','التاريخ','رقم المرجع','رقم الشيك','البيان','مدين','دائن','الرصيد','الثقة']});ws['!cols']=[8,14,18,16,45,14,14,14,10].map(w=>({wch:w}));ws['!views']=[{rightToLeft:true}];const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'كشف البنك');XLSX.writeFile(wb,safeName(name)+'-bank.xlsx')}
+function addOptions(){if(document.querySelector('#excelFinancialOpt'))return;const panel=document.querySelector('.panel');if(!panel)return;const box=document.createElement('div');box.id='excelFinancialOpt';box.className='hidden';box.innerHTML='<div class="row"><div class="field"><label>نوع الملف</label><select id="excelSource"><option value="auto">اكتشاف تلقائي</option><option value="text">PDF نصي</option><option value="image">PDF مصور OCR عربي</option></select></div><div class="field"><label>نوع الكشف</label><select id="excelProfile"><option value="bank">كشف بنك / مالي</option><option value="general">جدول عام</option></select></div></div><div class="note">يتم استخراج رقم الشيك من عمود مستقل أو من البيان أو من سطر مرتبط بالحركة.</div>';
+const run=document.querySelector('#run');run.parentElement.insertAdjacentElement('beforebegin',box)}
+function init(){const tools=document.querySelector('.tools');if(!tools)return;tools.querySelector('[data-t="compare"]')?.remove();addOptions();if(tools.querySelector('[data-excel-entry="true"]'))return;const tablesButton=tools.querySelector('[data-t="tables"]');if(!tablesButton)return;const btn=document.createElement('button');btn.type='button';btn.className='tool';btn.dataset.excelEntry='true';btn.innerHTML='<b>📗 PDF إلى Excel</b><span>كشوف عربية وأرقام شيكات</span>';btn.onclick=()=>{tablesButton.click();excelMode=true;document.querySelectorAll('.tool').forEach(x=>x.classList.remove('active'));btn.classList.add('active');document.querySelector('#tableOpt')?.classList.add('hidden');document.querySelector('#excelFinancialOpt')?.classList.remove('hidden');document.querySelector('#dropTitle').textContent='اختر كشف PDF لتحويله إلى Excel';document.querySelector('#dropHint').textContent='نصي أو مصور — عربي — مع رقم المرجع والشيك'};tools.insertBefore(btn,tablesButton);
+for(const other of tools.querySelectorAll('.tool:not([data-excel-entry="true"])'))other.addEventListener('click',()=>{excelMode=false;document.querySelector('#excelFinancialOpt')?.classList.add('hidden')});
+const run=document.querySelector('#run');run.addEventListener('click',async e=>{if(!excelMode)return;e.stopImmediatePropagation();e.preventDefault();try{run.disabled=true;const file=document.querySelector('#files')?.files?.[0];if(!file)throw Error('اختر ملف PDF');const data=await file.arrayBuffer();const pdf=await pdfjsLib.getDocument({data}).promise;let mode=document.querySelector('#excelSource')?.value||'auto';if(mode==='auto'){const p=await pdf.getPage(1),tc=await p.getTextContent();mode=tc.items.map(x=>x.str).join('').trim().length>20?'text':'image'}const records=mode==='image'?await extractOcrRows(pdf,'ara+eng'):await extractTextRows(pdf);exportXlsx(records,file.name)}catch(err){alert(err.message||'تعذر التحويل')}finally{run.disabled=false}},true)}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })();
