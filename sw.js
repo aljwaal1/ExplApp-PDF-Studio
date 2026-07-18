@@ -1,9 +1,8 @@
-const CACHE='explapp-pdf-studio-v20';
-const CORE=['./','./index.html','./manifest.webmanifest','./icon.svg','./book-fix.js','./core/pdf-studio-utils.js','./modules/pdf-excel-core.js','./ui/excel-preview.js','./modules/pdf-word-docx.js','./modules/images-to-pdf.js','./modules/pdf-to-html.js','./modules/pdf-markdown.js','./modules/pdf-search-advanced.js','./modules/pdf-ocr-advanced.js','./modules/pdf-tables-advanced.js','./modules/pdf-existing-tools-enhanced.js','./excel-tool.js'];
+const CACHE='explapp-pdf-studio-v21';
+const CORE=['./','./index.html','./manifest.webmanifest','./icon.svg','./core/pdf-studio-utils.js','./modules/pdf-excel-core.js','./ui/excel-preview.js','./modules/pdf-word-docx.js','./modules/images-to-pdf.js','./modules/pdf-to-html.js','./modules/pdf-markdown.js','./modules/pdf-search-advanced.js','./modules/pdf-ocr-advanced.js','./modules/pdf-tables-advanced.js','./modules/pdf-existing-tools-enhanced.js','./excel-tool.js'];
 
 function patchHtml(html){
  let patched=html;
- if(!patched.includes('book-fix.js'))patched=patched.replace('</body>','<script src="./book-fix.js"></script></body>');
  if(!patched.includes('core/pdf-studio-utils.js'))patched=patched.replace('</body>','<script src="./core/pdf-studio-utils.js"></script></body>');
  if(!patched.includes('modules/pdf-excel-core.js'))patched=patched.replace('</body>','<script src="./modules/pdf-excel-core.js"></script></body>');
  if(!patched.includes('ui/excel-preview.js'))patched=patched.replace('</body>','<script src="./ui/excel-preview.js"></script></body>');
