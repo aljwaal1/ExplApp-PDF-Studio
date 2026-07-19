@@ -7,6 +7,7 @@ const FIELDS=[
 ];
 const EXPORT_FIELDS=FIELDS.filter(([field])=>field!=='confidence');
 const TEMPLATE_KEY='explapp_excel_mapping_templates_v1';
+const UNIQUE_TARGETS=new Set(['page','date','reference','cheque','amount','debit','credit','balance']);
 
 function addStyles(){
   if(document.querySelector('#excelPreviewStyles'))return;
@@ -22,6 +23,7 @@ function addStyles(){
   .excel-preview-table{border-collapse:separate;border-spacing:0;width:max-content;min-width:100%;font-size:13px;direction:rtl}
   .excel-preview-table th{position:sticky;top:0;z-index:2;background:#eef3ff;color:#1d3f91;padding:7px;border:1px solid #d6deed;white-space:nowrap}
   .excel-preview-table th select{width:100%;min-width:105px;border:1px solid #b8c6dd;border-radius:7px;padding:6px;background:#fff;color:#173b86;font-weight:700}
+  .excel-preview-table th select.mapping-duplicate{border-color:#d92d20;background:#fff1f0;color:#b42318;box-shadow:0 0 0 2px #fecdca}
   .excel-preview-table td{min-width:110px;max-width:320px;padding:8px;border:1px solid #e1e7f0;background:#fff;vertical-align:top}
   .excel-preview-table td[data-source-field="description"]{min-width:280px;white-space:normal}
   .excel-preview-table td[contenteditable="true"]:focus{outline:2px solid #2859d8;background:#f7f9ff}
@@ -29,6 +31,7 @@ function addStyles(){
   .excel-row-delete{background:#fff0f0;color:#b42318;padding:6px 9px;border-radius:8px}
   .excel-preview-actions{padding:12px 16px;border-top:1px solid #dbe3ef;display:flex;gap:8px;justify-content:flex-start;flex-wrap:wrap}
   .excel-preview-actions button{min-width:130px}.excel-preview-status{margin-inline-start:auto;color:#667085;font-size:12px;align-self:center}
+  .excel-preview-status.error{color:#b42318;font-weight:700}
   @media(max-width:620px){.excel-preview-overlay{padding:0}.excel-preview-dialog{height:100vh;max-height:none;border-radius:0}.excel-preview-head{padding:10px}.excel-template-bar{padding:8px}.excel-template-bar input,.excel-template-bar select{flex:1;min-width:130px}.excel-preview-actions{position:sticky;bottom:0;background:#fff}.excel-preview-actions button{flex:1;min-width:120px}}
   `;document.head.appendChild(style);
 }
@@ -43,9 +46,21 @@ function coerce(field,value){
 function readTemplates(){try{return JSON.parse(localStorage.getItem(TEMPLATE_KEY)||'{}')}catch{return{}}}
 function writeTemplates(value){localStorage.setItem(TEMPLATE_KEY,JSON.stringify(value))}
 function currentMapping(table){return [...table.querySelectorAll('thead select[data-source-field]')].map(select=>({source:select.dataset.sourceField,target:select.value}))}
+function validateMapping(mapping){
+  const counts={};
+  for(const item of mapping||[]){if(item.target&&UNIQUE_TARGETS.has(item.target))counts[item.target]=(counts[item.target]||0)+1}
+  const duplicates=Object.keys(counts).filter(target=>counts[target]>1);
+  return {valid:duplicates.length===0,duplicates};
+}
 function applyMapping(table,mapping){
   const bySource=Object.fromEntries((mapping||[]).map(item=>[item.source,item.target]));
   table.querySelectorAll('thead select[data-source-field]').forEach(select=>{if(bySource[select.dataset.sourceField]!==undefined)select.value=bySource[select.dataset.sourceField]});
+}
+function markMappingState(table,status){
+  const mapping=currentMapping(table),result=validateMapping(mapping);
+  table.querySelectorAll('thead select[data-source-field]').forEach(select=>select.classList.toggle('mapping-duplicate',result.duplicates.includes(select.value)));
+  if(status){status.classList.toggle('error',!result.valid);status.textContent=result.valid?'يمكن حفظ تعيين الأعمدة لكل بنك':`لا يمكن تكرار تعيين: ${result.duplicates.map(field=>EXPORT_FIELDS.find(([key])=>key===field)?.[1]||field).join('، ')}`}
+  return result;
 }
 function collect(table){
   const mapping=currentMapping(table);
@@ -101,19 +116,20 @@ function show(records,{fileName='bank-statement.pdf',onExport}={}){
   });
   table.append(thead,tbody);scroll.appendChild(table);
 
-  templateSelect.onchange=()=>{const name=templateSelect.value;if(!name)return;const templates=readTemplates();applyMapping(table,templates[name]);templateName.value=name};
-  saveTemplate.onclick=()=>{const name=templateName.value.trim();if(!name){alert('اكتب اسم البنك أو القالب');return}const templates=readTemplates();templates[name]=currentMapping(table);writeTemplates(templates);fillTemplateSelect(templateSelect);templateSelect.value=name;alert('تم حفظ تعيين الأعمدة')};
-  deleteTemplate.onclick=()=>{const name=templateSelect.value||templateName.value.trim();if(!name)return;const templates=readTemplates();delete templates[name];writeTemplates(templates);fillTemplateSelect(templateSelect);templateName.value=''};
-
   const actions=document.createElement('div');actions.className='excel-preview-actions';
   const exportButton=document.createElement('button');exportButton.type='button';exportButton.className='primary';exportButton.textContent='اعتماد وتنزيل Excel';
   const cancelButton=document.createElement('button');cancelButton.type='button';cancelButton.className='danger';cancelButton.textContent='إلغاء';
   const status=document.createElement('span');status.className='excel-preview-status';status.textContent='يمكن حفظ تعيين الأعمدة لكل بنك';
-  exportButton.onclick=()=>{const edited=collect(table);if(!edited.length){alert('لا توجد صفوف للتصدير');return}onExport?.(edited,fileName);overlay.remove()};
+
+  table.addEventListener('change',event=>{if(event.target.matches('thead select[data-source-field]'))markMappingState(table,status)});
+  templateSelect.onchange=()=>{const name=templateSelect.value;if(!name)return;const templates=readTemplates();applyMapping(table,templates[name]);templateName.value=name;markMappingState(table,status)};
+  saveTemplate.onclick=()=>{const state=markMappingState(table,status);if(!state.valid){alert('صحح تعيين الأعمدة المكرر أولًا');return}const name=templateName.value.trim();if(!name){alert('اكتب اسم البنك أو القالب');return}const templates=readTemplates();templates[name]=currentMapping(table);writeTemplates(templates);fillTemplateSelect(templateSelect);templateSelect.value=name;alert('تم حفظ تعيين الأعمدة')};
+  deleteTemplate.onclick=()=>{const name=templateSelect.value||templateName.value.trim();if(!name)return;const templates=readTemplates();delete templates[name];writeTemplates(templates);fillTemplateSelect(templateSelect);templateName.value=''};
+  exportButton.onclick=()=>{const state=markMappingState(table,status);if(!state.valid){alert('يوجد تعيين مكرر لعمود مالي أو تعريفي');return}const edited=collect(table);if(!edited.length){alert('لا توجد صفوف للتصدير');return}onExport?.(edited,fileName);overlay.remove()};
   cancelButton.onclick=()=>overlay.remove();overlay.onclick=event=>{if(event.target===overlay)overlay.remove()};
   actions.append(exportButton,cancelButton,status);dialog.append(head,templateBar,scroll,actions);overlay.appendChild(dialog);document.body.appendChild(overlay);
-  setTimeout(()=>table.querySelector('tbody td')?.focus(),0);
+  markMappingState(table,status);setTimeout(()=>table.querySelector('tbody td')?.focus(),0);
 }
 
-window.ExplAppExcelPreview={show,collect,currentMapping,applyMapping};
+window.ExplAppExcelPreview={show,collect,currentMapping,applyMapping,validateMapping};
 })();
