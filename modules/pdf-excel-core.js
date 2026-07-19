@@ -39,6 +39,7 @@ const referenceRx=/(?:مرجع|المرجع|رقم\s*المستند|مستند|r
 const debitDirectionRx=/^(?:D|DR|DB|DEBIT|مدين|سحب)$/i;
 const creditDirectionRx=/^(?:C|CR|CD|CREDIT|دائن|إيداع|ايداع)$/i;
 const normalizeDirection=value=>{const text=clean(value);if(debitDirectionRx.test(text))return'debit';if(creditDirectionRx.test(text))return'credit';return''};
+const nonAmountColumnTypes=new Set(['date','cheque','reference','description','direction']);
 
 function safeName(name){return String(name||'bank-statement').replace(/\.pdf$/i,'').replace(/[\\/:*?"<>|]/g,'_')}
 function groupRows(items){
@@ -80,6 +81,12 @@ function appendContinuation(record,text){
   if(record.confidence==='مرتفع')record.confidence='متوسط';
   return true;
 }
+function isAmountCandidate(cell,map,columns){
+  const value=clean(cell.text),type=map[nearestColumn(cell.x,columns)];
+  if(nonAmountColumnTypes.has(type))return false;
+  if(dateOnlyRx.test(value)||chequeRx.test(value)||referenceRx.test(value)||normalizeDirection(value))return false;
+  return money(value)!=='';
+}
 function buildRecords(rows,pageNo){
   if(!rows.length)return[];
   const headerIndex=detectHeader(rows),dataRows=headerIndex>=0?rows.slice(headerIndex+1):rows;
@@ -91,7 +98,7 @@ function buildRecords(rows,pageNo){
   const out=[];let leadingContinuation='';
   for(const row of dataRows){
     const text=rowText(row);if(!text||headerScore(row)>=2)continue;
-    const hasDate=dateRx.test(text),nums=row.map(cell=>money(cell.text)).filter(value=>value!==''&&Math.abs(value)<1e15);
+    const hasDate=dateRx.test(text),nums=row.filter(cell=>isAmountCandidate(cell,map,columns)).map(cell=>money(cell.text)).filter(value=>value!==''&&Math.abs(value)<1e15);
     const cheque=(text.match(chequeRx)||[])[1]||'',reference=(text.match(referenceRx)||[])[1]||'';
     if(!hasDate&&nums.length===0&&text.length<160){if(out.length)appendContinuation(out[out.length-1],text);else leadingContinuation=clean([leadingContinuation,text].filter(Boolean).join(' '));continue}
     const record={page:pageNo,date:'',reference,cheque,description:'',amount:'',debit:'',credit:'',balance:'',direction:'',confidence:'متوسط'};
