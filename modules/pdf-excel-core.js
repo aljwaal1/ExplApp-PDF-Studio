@@ -52,6 +52,13 @@ const extractIdentifier=(value,type)=>{
 const debitDirectionRx=/^(?:D|DR|DB|DEBIT|مدين|سحب)$/i;
 const creditDirectionRx=/^(?:C|CR|CD|CREDIT|دائن|إيداع|ايداع)$/i;
 const normalizeDirection=value=>{const text=clean(value);if(debitDirectionRx.test(text))return'debit';if(creditDirectionRx.test(text))return'credit';return''};
+const deriveSignedAmount=record=>{
+  if(record.amount!=='')return record.amount;
+  if(record.debit===''&&record.credit==='')return'';
+  const debit=record.debit===''?0:Math.abs(Number(record.debit));
+  const credit=record.credit===''?0:Math.abs(Number(record.credit));
+  return Number.isFinite(debit)&&Number.isFinite(credit)?credit-debit:'';
+};
 const nonAmountColumnTypes=new Set(['date','cheque','reference','description','direction']);
 
 function safeName(name){return String(name||'bank-statement').replace(/\.pdf$/i,'').replace(/[\\/:*?"<>|]/g,'_')}
@@ -137,6 +144,7 @@ function buildRecords(rows,pageNo){
       else if(amounts.length===1)record.amount=amounts[0];
       record.confidence='منخفض';
     }else record.confidence='مرتفع';
+    record.amount=deriveSignedAmount(record);
     if(record.amount!==''&&record.direction)record.amount=record.direction==='debit'?-Math.abs(record.amount):Math.abs(record.amount);
     if(record.date||record.description||nums.length)out.push(record);
   }
@@ -156,5 +164,5 @@ function exportXlsx(records,name){
   const sheet=XLSX.utils.json_to_sheet(rows,{header});sheet['!cols']=[8,14,18,16,45,14,14,14,14,10].map(wch=>({wch}));sheet['!views']=[{rightToLeft:true}];
   const workbook=XLSX.utils.book_new();XLSX.utils.book_append_sheet(workbook,sheet,'كشف البنك');XLSX.writeFile(workbook,`${safeName(name)}-bank.xlsx`);
 }
-window.ExplAppPdfExcelCore={extractTextRows,extractOcrRows,exportXlsx,buildRecords,groupRows,clean,money};
+window.ExplAppPdfExcelCore={extractTextRows,extractOcrRows,exportXlsx,buildRecords,groupRows,clean,money,deriveSignedAmount};
 })();
