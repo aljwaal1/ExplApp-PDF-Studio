@@ -118,7 +118,7 @@ function buildRecords(rows,pageNo){
   const out=[];let leadingContinuation='';
   for(const row of dataRows){
     const text=rowText(row);if(!text||headerScore(row)>=2)continue;
-    const hasDate=dateRx.test(text),nums=row.filter(cell=>isAmountCandidate(cell,map,columns)).map(cell=>money(cell.text)).filter(value=>value!==''&&Math.abs(value)<1e15);
+    const hasDate=dateRx.test(text),nums=logicalCells(row).filter(cell=>isAmountCandidate(cell,map,columns)).map(cell=>money(cell.text)).filter(value=>value!==''&&Math.abs(value)<1e15);
     const cheque=extractIdentifier(text,'cheque'),reference=extractIdentifier(text,'reference');
     if(!hasDate&&nums.length===0&&text.length<160){if(out.length)appendContinuation(out[out.length-1],text);else leadingContinuation=clean([leadingContinuation,text].filter(Boolean).join(' '));continue}
     const record={page:pageNo,date:'',reference,cheque,description:'',amount:'',debit:'',credit:'',balance:'',direction:'',confidence:'متوسط'};
