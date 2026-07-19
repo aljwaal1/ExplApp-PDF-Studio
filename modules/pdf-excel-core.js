@@ -36,6 +36,19 @@ const money=value=>{
 const dateRx=/(?:\d{1,2}[\/\-.]\d{1,2}(?:[\/\-.]\d{2,4})?|\d{4}[\/\-.]\d{1,2}[\/\-.]\d{1,2})/;
 const chequeRx=/(?:شيك|الشـيك|رقم\s*الشيك|chq|cheque|check)\s*[:#\-]?\s*([A-Z0-9\-\/]{3,})/i;
 const referenceRx=/(?:مرجع|المرجع|رقم\s*المستند|مستند|reference|ref)\s*[:#\-]?\s*([A-Z0-9\-\/]{3,})/i;
+const identifierLabelRx={
+  cheque:/(?:رقم\s*)?(?:الشيك|الشـيك|شيك)|chq|cheque|check/ig,
+  reference:/(?:رقم\s*)?(?:المرجع|مرجع|المستند|مستند)|reference|ref/ig
+};
+const normalizeIdentifier=(value,type)=>{
+  let text=clean(value).replace(identifierLabelRx[type]||/$^/g,' ').replace(/^[\s:#\-–—]+|[\s:#\-–—]+$/g,'');
+  text=text.replace(/\s*([\/-])\s*/g,'$1');
+  return /^[A-Z0-9\s\/-]+$/i.test(text)?text.replace(/\s+/g,''):text;
+};
+const extractIdentifier=(value,type)=>{
+  const match=clean(value).match(type==='cheque'?chequeRx:referenceRx);
+  return match?normalizeIdentifier(match[1],type):'';
+};
 const debitDirectionRx=/^(?:D|DR|DB|DEBIT|مدين|سحب)$/i;
 const creditDirectionRx=/^(?:C|CR|CD|CREDIT|دائن|إيداع|ايداع)$/i;
 const normalizeDirection=value=>{const text=clean(value);if(debitDirectionRx.test(text))return'debit';if(creditDirectionRx.test(text))return'credit';return''};
@@ -74,7 +87,7 @@ function classifyHeader(text){
 }
 function appendContinuation(record,text){
   if(!record||!text)return false;
-  const cheque=(text.match(chequeRx)||[])[1]||'',reference=(text.match(referenceRx)||[])[1]||'';
+  const cheque=extractIdentifier(text,'cheque'),reference=extractIdentifier(text,'reference');
   record.cheque=record.cheque||cheque;record.reference=record.reference||reference;
   const description=clean(text.replace(chequeRx,'').replace(referenceRx,''));
   if(description)record.description=clean(`${record.description} ${description}`);
@@ -99,22 +112,23 @@ function buildRecords(rows,pageNo){
   for(const row of dataRows){
     const text=rowText(row);if(!text||headerScore(row)>=2)continue;
     const hasDate=dateRx.test(text),nums=row.filter(cell=>isAmountCandidate(cell,map,columns)).map(cell=>money(cell.text)).filter(value=>value!==''&&Math.abs(value)<1e15);
-    const cheque=(text.match(chequeRx)||[])[1]||'',reference=(text.match(referenceRx)||[])[1]||'';
+    const cheque=extractIdentifier(text,'cheque'),reference=extractIdentifier(text,'reference');
     if(!hasDate&&nums.length===0&&text.length<160){if(out.length)appendContinuation(out[out.length-1],text);else leadingContinuation=clean([leadingContinuation,text].filter(Boolean).join(' '));continue}
     const record={page:pageNo,date:'',reference,cheque,description:'',amount:'',debit:'',credit:'',balance:'',direction:'',confidence:'متوسط'};
     const buckets={};row.forEach(cell=>{const index=nearestColumn(cell.x,columns);(buckets[index]??=[]).push(cell)});
     for(const [index,cells] of Object.entries(buckets)){
       const value=clean(logicalCells(cells).map(cell=>cell.text).join(' ')),type=map[index];
       if(type==='date')record.date=(value.match(dateRx)||[])[0]||value;
-      else if(type==='cheque')record.cheque=record.cheque||value;
-      else if(type==='reference')record.reference=record.reference||value;
+      else if(type==='cheque')record.cheque=record.cheque||normalizeIdentifier(value,'cheque');
+      else if(type==='reference')record.reference=record.reference||normalizeIdentifier(value,'reference');
       else if(type==='description')record.description=value;
       else if(type==='direction')record.direction=normalizeDirection(value);
       else if(['amount','debit','credit','balance'].includes(type))record[type]=money(value);
     }
     if(!record.date)record.date=(text.match(dateRx)||[])[0]||'';
     if(!record.description){const monetaryTokens=row.filter(cell=>money(cell.text)!=='').map(cell=>cell.text);record.description=clean(text.replace(dateRx,'').replace(chequeRx,'').replace(referenceRx,'').split(' ').filter(token=>!monetaryTokens.includes(token)&&!normalizeDirection(token)).join(' '))}
-    if(!record.cheque)record.cheque=(record.description.match(chequeRx)||[])[1]||'';
+    if(!record.cheque)record.cheque=extractIdentifier(record.description,'cheque');
+    if(!record.reference)record.reference=extractIdentifier(record.description,'reference');
     if(leadingContinuation){appendContinuation(record,leadingContinuation);leadingContinuation=''}
     if(Object.keys(map).length<2){
       const amounts=nums.slice(-3);
