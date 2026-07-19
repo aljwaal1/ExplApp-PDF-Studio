@@ -151,11 +151,28 @@ function buildRecords(rows,pageNo){
   if(leadingContinuation&&out.length)appendContinuation(out[out.length-1],leadingContinuation);
   return out;
 }
+function enhanceOcrImageData(imageData){
+  const data=imageData?.data;
+  if(!data||typeof data.length!=='number')return imageData;
+  for(let index=0;index<data.length;index+=4){
+    const luminance=Math.round(data[index]*.299+data[index+1]*.587+data[index+2]*.114);
+    const contrasted=Math.max(0,Math.min(255,Math.round((luminance-128)*1.45+128)));
+    const value=contrasted>235?255:contrasted;
+    data[index]=value;data[index+1]=value;data[index+2]=value;
+  }
+  return imageData;
+}
+function preprocessOcrCanvas(canvas){
+  const context=canvas.getContext('2d',{willReadFrequently:true});
+  const imageData=context.getImageData(0,0,canvas.width,canvas.height);
+  context.putImageData(enhanceOcrImageData(imageData),0,0);
+  return canvas;
+}
 async function extractTextRows(pdf){const records=[];for(let pageNo=1;pageNo<=pdf.numPages;pageNo++){const page=await pdf.getPage(pageNo),content=await page.getTextContent();records.push(...buildRecords(groupRows(content.items),pageNo))}return records}
 async function extractOcrRows(pdf,lang='ara+eng'){
   if(!window.Tesseract)throw Error('محرك OCR غير متوفر');
   const worker=await Tesseract.createWorker(lang),records=[];
-  try{for(let pageNo=1;pageNo<=pdf.numPages;pageNo++){const page=await pdf.getPage(pageNo),viewport=page.getViewport({scale:2}),canvas=document.createElement('canvas');canvas.width=viewport.width;canvas.height=viewport.height;await page.render({canvasContext:canvas.getContext('2d'),viewport}).promise;const result=await worker.recognize(canvas);const items=(result.data.words||[]).map(word=>({str:word.text,transform:[1,0,0,1,word.bbox.x0,canvas.height-word.bbox.y0],width:word.bbox.x1-word.bbox.x0}));records.push(...buildRecords(groupRows(items),pageNo))}}finally{await worker.terminate()}return records;
+  try{for(let pageNo=1;pageNo<=pdf.numPages;pageNo++){const page=await pdf.getPage(pageNo),viewport=page.getViewport({scale:2}),canvas=document.createElement('canvas');canvas.width=viewport.width;canvas.height=viewport.height;await page.render({canvasContext:canvas.getContext('2d'),viewport}).promise;preprocessOcrCanvas(canvas);const result=await worker.recognize(canvas);const items=(result.data.words||[]).map(word=>({str:word.text,transform:[1,0,0,1,word.bbox.x0,canvas.height-word.bbox.y0],width:word.bbox.x1-word.bbox.x0}));records.push(...buildRecords(groupRows(items),pageNo))}}finally{await worker.terminate()}return records;
 }
 function exportXlsx(records,name){
   if(!records.length)throw Error('لم يتم اكتشاف حركات قابلة للتحويل');
@@ -164,5 +181,5 @@ function exportXlsx(records,name){
   const sheet=XLSX.utils.json_to_sheet(rows,{header});sheet['!cols']=[8,14,18,16,45,14,14,14,14,10].map(wch=>({wch}));sheet['!views']=[{rightToLeft:true}];
   const workbook=XLSX.utils.book_new();XLSX.utils.book_append_sheet(workbook,sheet,'كشف البنك');XLSX.writeFile(workbook,`${safeName(name)}-bank.xlsx`);
 }
-window.ExplAppPdfExcelCore={extractTextRows,extractOcrRows,exportXlsx,buildRecords,groupRows,clean,money,deriveSignedAmount};
+window.ExplAppPdfExcelCore={extractTextRows,extractOcrRows,exportXlsx,buildRecords,groupRows,clean,money,deriveSignedAmount,enhanceOcrImageData};
 })();
