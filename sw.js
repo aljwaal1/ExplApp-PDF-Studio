@@ -1,4 +1,4 @@
-const CACHE='explapp-pdf-studio-v26';
+const CACHE='explapp-pdf-studio-v27';
 const MODULE_SCRIPTS=[
  './core/pdf-studio-utils.js',
  './modules/pdf-excel-core.js',
@@ -19,13 +19,23 @@ function scriptTag(path){
  return `<script src="${path}"></script>`;
 }
 
+function closingBodyIndex(html){
+ const expression=/<\/body\s*>/gi;
+ let match;
+ let last=-1;
+ while((match=expression.exec(html)))last=match.index;
+ return last;
+}
+
 function patchHtml(html){
- let patched=html;
- for(const path of MODULE_SCRIPTS){
-  const normalized=path.replace(/^\.\//,'');
-  if(!patched.includes(normalized))patched=patched.replace('</body>',`${scriptTag(path)}</body>`);
- }
- return patched;
+ const tags=MODULE_SCRIPTS
+  .filter(path=>!html.includes(path.replace(/^\.\//,'')))
+  .map(scriptTag)
+  .join('');
+ if(!tags)return html;
+ const index=closingBodyIndex(html);
+ if(index<0)return `${html}${tags}`;
+ return `${html.slice(0,index)}${tags}${html.slice(index)}`;
 }
 
 self.addEventListener('install',event=>event.waitUntil(
