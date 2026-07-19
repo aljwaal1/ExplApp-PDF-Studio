@@ -15,9 +15,17 @@ function addOptions(){
 }
 
 async function detectMode(pdf){
-  const first=await pdf.getPage(1);
-  const content=await first.getTextContent();
-  return content.items.map(item=>item.str).join('').trim().length>20?'text':'image';
+  const sampleSize=Math.min(pdf.numPages||1,3);
+  let textPages=0,totalChars=0;
+  for(let pageNo=1;pageNo<=sampleSize;pageNo++){
+    const page=await pdf.getPage(pageNo);
+    const content=await page.getTextContent();
+    const chars=content.items.map(item=>item.str||'').join('').replace(/\s+/g,'').length;
+    totalChars+=chars;
+    if(chars>=20)textPages++;
+  }
+  const requiredPages=Math.max(1,Math.ceil(sampleSize/2));
+  return textPages>=requiredPages||totalChars>=80?'text':'image';
 }
 
 function numericValue(value){
