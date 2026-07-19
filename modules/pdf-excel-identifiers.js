@@ -35,6 +35,43 @@ function preserveIdentifierColumns(sheet,rowCount){
   return sheet;
 }
 
+function finiteNumber(value){
+  if(value===''||value===null||value===undefined)return 0;
+  const number=Number(value);
+  return Number.isFinite(number)?number:0;
+}
+
+function statementSummary(records){
+  const summary={transactions:records.length,totalDebit:0,totalCredit:0,netAmount:0,closingBalance:'',lowConfidence:0};
+  for(const record of records){
+    summary.totalDebit+=Math.abs(finiteNumber(record.debit));
+    summary.totalCredit+=Math.abs(finiteNumber(record.credit));
+    summary.netAmount+=finiteNumber(record.amount);
+    if(record.balance!==''&&Number.isFinite(Number(record.balance)))summary.closingBalance=Number(record.balance);
+    if(record.confidence==='منخفض')summary.lowConfidence++;
+  }
+  return summary;
+}
+
+function createSummarySheet(records){
+  const summary=statementSummary(records);
+  const rows=[
+    ['ملخص كشف البنك','القيمة'],
+    ['عدد الحركات',summary.transactions],
+    ['إجمالي المدين',summary.totalDebit],
+    ['إجمالي الدائن',summary.totalCredit],
+    ['صافي الحركة',summary.netAmount],
+    ['الرصيد الختامي',summary.closingBalance],
+    ['حركات تحتاج مراجعة',summary.lowConfidence]
+  ];
+  const sheet=XLSX.utils.aoa_to_sheet(rows);
+  sheet['!cols']=[{wch:24},{wch:18}];
+  sheet['!views']=[{rightToLeft:true}];
+  for(let row=3;row<=6;row++){const cell=sheet[`B${row}`];if(cell)cell.z='#,##0.00;[Red]-#,##0.00'}
+  sheet['!autofilter']={ref:'A1:B7'};
+  return sheet;
+}
+
 function exportXlsx(records,name){
   if(!records.length)throw Error('لم يتم اكتشاف حركات قابلة للتحويل');
   const rows=records.map(record=>({
@@ -54,7 +91,9 @@ function exportXlsx(records,name){
   preserveIdentifierColumns(sheet,rows.length);
   sheet['!cols']=[8,14,18,16,45,14,14,14,14,10].map(wch=>({wch}));
   sheet['!views']=[{rightToLeft:true}];
+  sheet['!autofilter']={ref:`A1:J${rows.length+1}`};
   const workbook=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook,createSummarySheet(records),'الملخص');
   XLSX.utils.book_append_sheet(workbook,sheet,'كشف البنك');
   const safeName=String(name||'bank-statement').replace(/\.pdf$/i,'').replace(/[\\/:*?"<>|]/g,'_');
   XLSX.writeFile(workbook,`${safeName}-bank.xlsx`);
@@ -63,4 +102,6 @@ function exportXlsx(records,name){
 core.exportXlsx=exportXlsx;
 core.asIdentifierText=asIdentifierText;
 core.preserveIdentifierColumns=preserveIdentifierColumns;
+core.statementSummary=statementSummary;
+core.createSummarySheet=createSummarySheet;
 })();
