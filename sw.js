@@ -1,4 +1,4 @@
-const CACHE='explapp-pdf-studio-v29';
+const CACHE='explapp-pdf-studio-v30';
 const MODULE_SCRIPTS=[
  './core/pdf-studio-utils.js',
  './modules/pdf-excel-core.js',
@@ -12,6 +12,7 @@ const MODULE_SCRIPTS=[
  './modules/pdf-search-advanced.js',
  './modules/pdf-ocr-advanced.js',
  './modules/pdf-tables-advanced.js',
+ './modules/pdf-book-structure.js',
  './modules/pdf-existing-tools-enhanced.js',
  './excel-tool.js'
 ];
