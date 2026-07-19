@@ -20,6 +20,28 @@ async function detectMode(pdf){
   return content.items.map(item=>item.str).join('').trim().length>20?'text':'image';
 }
 
+function numericValue(value){
+  if(typeof value==='number')return Number.isFinite(value)?value:'';
+  const core=window.ExplAppPdfExcelCore;
+  const parsed=core?.money?core.money(value):Number(value);
+  return parsed===''||!Number.isFinite(parsed)?'':parsed;
+}
+
+function unifiedAmount(record){
+  const direct=numericValue(record.amount);
+  if(direct!=='')return direct;
+  const debit=numericValue(record.debit);
+  const credit=numericValue(record.credit);
+  if(debit!==''&&credit!=='')return Math.abs(credit)-Math.abs(debit);
+  if(debit!=='')return -Math.abs(debit);
+  if(credit!=='')return Math.abs(credit);
+  return'';
+}
+
+function normalizeFinancialRecords(records){
+  return records.map(record=>({...record,amount:unifiedAmount(record)}));
+}
+
 async function extractExcelRecords(){
   const core=window.ExplAppPdfExcelCore;
   if(!core)throw Error('محرك PDF إلى Excel غير محمل');
@@ -29,7 +51,9 @@ async function extractExcelRecords(){
   const pdf=await pdfjsLib.getDocument({data}).promise;
   let mode=document.querySelector('#excelSource')?.value||'auto';
   if(mode==='auto')mode=await detectMode(pdf);
-  const records=mode==='image'?await core.extractOcrRows(pdf,'ara+eng'):await core.extractTextRows(pdf);
+  const extracted=mode==='image'?await core.extractOcrRows(pdf,'ara+eng'):await core.extractTextRows(pdf);
+  const profile=document.querySelector('#excelProfile')?.value||'bank';
+  const records=profile==='bank'?normalizeFinancialRecords(extracted):extracted;
   if(!records.length)throw Error('لم يتم اكتشاف حركات قابلة للمراجعة');
   return {records,fileName:file.name};
 }
