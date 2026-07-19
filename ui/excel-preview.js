@@ -3,7 +3,7 @@
 
 const FIELDS=[
   ['page','الصفحة'],['date','التاريخ'],['reference','رقم المرجع'],['cheque','رقم الشيك'],
-  ['description','البيان'],['debit','مدين'],['credit','دائن'],['balance','الرصيد'],['confidence','الثقة']
+  ['description','البيان'],['amount','المبلغ المباشر'],['debit','مدين'],['credit','دائن'],['balance','الرصيد'],['confidence','الثقة']
 ];
 const EXPORT_FIELDS=FIELDS.filter(([field])=>field!=='confidence');
 const TEMPLATE_KEY='explapp_excel_mapping_templates_v1';
@@ -35,7 +35,7 @@ function addStyles(){
 
 function coerce(field,value){
   const text=String(value??'').trim();
-  if(['page','debit','credit','balance'].includes(field)&&text!==''){
+  if(['page','amount','debit','credit','balance'].includes(field)&&text!==''){
     const number=Number(text.replace(/,/g,''));return Number.isFinite(number)?number:text;
   }
   return text;
