@@ -6,10 +6,10 @@ const U=()=>window.PDFStudioUtils;
 let active=false;
 
 const MODE_PATTERNS={
-  chapter:'(?:الفصل|الباب|chapter)\\s*(?:رقم\\s*)?(?:[0-9٠-٩۰-۹]+|[A-Z]+|الأول|الثاني|الثالث|الرابع|الخامس|السادس|السابع|الثامن|التاسع|العاشر|one|two|three|four|five|six|seven|eight|nine|ten)',
-  unit:'(?:الوحدة|unit)\\s*(?:رقم\\s*)?(?:[0-9٠-٩۰-۹]+|[A-Z]+|الأولى|الثانية|الثالثة|الرابعة|الخامسة|السادسة|السابعة|الثامنة|التاسعة|العاشرة|one|two|three|four|five|six|seven|eight|nine|ten)',
-  part:'(?:الجزء|القسم|part|section)\\s*(?:رقم\\s*)?(?:[0-9٠-٩۰-۹]+|[IVXLCDM]+|[A-Z]+|الأول|الثاني|الثالث|الرابع|الخامس|one|two|three|four|five)',
-  lesson:'(?:الدرس|lesson)\\s*(?:رقم\\s*)?(?:[0-9٠-٩۰-۹]+|[A-Z]+|الأول|الثاني|الثالث|الرابع|الخامس|one|two|three|four|five)'
+  chapter:'(?:الفصل|الباب|chapter)\\s*(?:رقم\\s*)?(?:[0-9٠-٩۰-۹]+|[IVXLCDM]+|الأول|الثاني|الثالث|الرابع|الخامس|السادس|السابع|الثامن|التاسع|العاشر|one|two|three|four|five|six|seven|eight|nine|ten)',
+  unit:'(?:الوحدة|unit)\\s*(?:رقم\\s*)?(?:[0-9٠-٩۰-۹]+|[IVXLCDM]+|الأولى|الثانية|الثالثة|الرابعة|الخامسة|السادسة|السابعة|الثامنة|التاسعة|العاشرة|one|two|three|four|five|six|seven|eight|nine|ten)',
+  part:'(?:الجزء|القسم|part|section)\\s*(?:رقم\\s*)?(?:[0-9٠-٩۰-۹]+|[IVXLCDM]+|الأول|الثاني|الثالث|الرابع|الخامس|one|two|three|four|five)',
+  lesson:'(?:الدرس|lesson)\\s*(?:رقم\\s*)?(?:[0-9٠-٩۰-۹]+|[IVXLCDM]+|الأول|الثاني|الثالث|الرابع|الخامس|one|two|three|four|five)'
 };
 
 function optionsHtml(){
