@@ -48,16 +48,21 @@ function headingExpression(){
   const mode=$('#bookStructureMode')?.value||'chapter';
   const source=mode==='custom'?($('#bookStructurePattern')?.value||'').trim():MODE_PATTERNS[mode];
   if(!source)throw Error('اكتب كلمات التقسيم المخصصة');
-  try{return new RegExp(`(?:^|\\s)(${source})(?:\\s|[:.\\-–—]|$)`,'iu')}catch{throw Error('صيغة كلمات التقسيم غير صحيحة')}
+  // Structural headings must begin the row. This rejects prose such as
+  // “as explained in Chapter 3” while still accepting “2. Chapter Two”.
+  try{return new RegExp(`^(?:[0-9٠-٩۰-۹]+\\s*[.)\\-–—:]\\s*)?(${source})(?:\\s|[:.\\-–—]|$)`,'iu')}catch{throw Error('صيغة كلمات التقسيم غير صحيحة')}
 }
 
-function choosePageHeading(rows,expression){
+function choosePageHeading(rows,expression,pageHeight){
   const matches=[];
   for(const row of rows){
     const text=U().clean(row.text);
     if(text.length<3||text.length>180||!expression.test(text))continue;
     const y=Math.max(...row.items.map(item=>Number(item.transform?.[5]||0)));
     const size=Math.max(...row.items.map(item=>Number(item.height||0)));
+    // PDF coordinates start at the bottom. A real chapter heading normally
+    // appears in the upper 60% of the page; references inside body text do not.
+    if(Number.isFinite(pageHeight)&&pageHeight>0&&y<pageHeight*0.4)continue;
     matches.push({title:text,y,size});
   }
   matches.sort((a,b)=>b.y-a.y||b.size-a.size);
@@ -73,7 +78,7 @@ async function detectStarts(pdf){
     U().setProgress(5+(pageNo/pdf.numPages)*80,`فحص بنية الكتاب — الصفحة ${pageNo}`);
     const page=await pdf.getPage(pageNo);
     const rows=U().groupRows((await page.getTextContent()).items,{rtl:'auto'});
-    const heading=choosePageHeading(rows,expression);
+    const heading=choosePageHeading(rows,expression,page.getViewport({scale:1}).height);
     if(!heading)continue;
     const key=normalizeTitle(heading.title);
     if(!key||seenTitles.has(key))continue;
