@@ -41,12 +41,27 @@ function finiteNumber(value){
   return Number.isFinite(number)?number:0;
 }
 
+function hasFiniteNumber(value){
+  if(value===''||value===null||value===undefined)return false;
+  return Number.isFinite(Number(value));
+}
+
+function signedTransactionAmount(record){
+  if(hasFiniteNumber(record.amount))return Number(record.amount);
+  const hasDebit=hasFiniteNumber(record.debit);
+  const hasCredit=hasFiniteNumber(record.credit);
+  if(!hasDebit&&!hasCredit)return'';
+  const debit=hasDebit?Math.abs(Number(record.debit)):0;
+  const credit=hasCredit?Math.abs(Number(record.credit)):0;
+  return credit-debit;
+}
+
 function statementSummary(records){
   const summary={transactions:records.length,totalDebit:0,totalCredit:0,netAmount:0,closingBalance:'',lowConfidence:0};
   for(const record of records){
     summary.totalDebit+=Math.abs(finiteNumber(record.debit));
     summary.totalCredit+=Math.abs(finiteNumber(record.credit));
-    summary.netAmount+=finiteNumber(record.amount);
+    summary.netAmount+=finiteNumber(signedTransactionAmount(record));
     if(record.balance!==''&&Number.isFinite(Number(record.balance)))summary.closingBalance=Number(record.balance);
     if(record.confidence==='منخفض')summary.lowConfidence++;
   }
@@ -80,7 +95,7 @@ function exportXlsx(records,name){
     'رقم المرجع':asIdentifierText(record.reference),
     'رقم الشيك':asIdentifierText(record.cheque),
     'البيان':record.description,
-    'المبلغ':record.amount,
+    'المبلغ':signedTransactionAmount(record),
     'مدين':record.debit,
     'دائن':record.credit,
     'الرصيد':record.balance,
@@ -102,6 +117,7 @@ function exportXlsx(records,name){
 core.exportXlsx=exportXlsx;
 core.asIdentifierText=asIdentifierText;
 core.preserveIdentifierColumns=preserveIdentifierColumns;
+core.signedTransactionAmount=signedTransactionAmount;
 core.statementSummary=statementSummary;
 core.createSummarySheet=createSummarySheet;
 })();
