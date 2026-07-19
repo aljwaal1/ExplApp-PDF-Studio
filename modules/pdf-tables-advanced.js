@@ -47,6 +47,29 @@ function rowToCells(row){
   return cells.filter(Boolean);
 }
 
+function numericLike(value){
+  const text=U().clean(value).replace(/[٠-٩]/g,digit=>'٠١٢٣٤٥٦٧٨٩'.indexOf(digit)).replace(/[٬,\s]/g,'');
+  return /^\(?[-+]?\d+(?:\.\d+)?\)?(?:\s*(?:د\.؟أ|ر\.؟س|USD|JOD|SAR))?$/i.test(text);
+}
+
+function dateLike(value){
+  const text=U().clean(value).replace(/[٠-٩]/g,digit=>'٠١٢٣٤٥٦٧٨٩'.indexOf(digit));
+  return /^(?:\d{1,4}[\/.-]){2}\d{1,4}$/.test(text);
+}
+
+function appendContinuation(current,row){
+  if(!current.length||row.cells.length!==1)return false;
+  const text=U().clean(row.cells[0]);
+  if(!text||numericLike(text)||dateLike(text))return false;
+  const target=current[current.length-1].cells;
+  if(!target?.length)return false;
+  let index=target.findIndex(cell=>cell&&!numericLike(cell)&&!dateLike(cell));
+  if(index<0)index=target.findIndex(cell=>!cell);
+  if(index<0)return false;
+  target[index]=U().clean(`${target[index]||''} ${text}`);
+  return true;
+}
+
 function segmentTables(rows,pageNo){
   const candidates=rows.map(row=>({...row,cells:rowToCells(row)}));
   const heights=candidates.map(row=>row.height);
@@ -60,12 +83,17 @@ function segmentTables(rows,pageNo){
     current=[];
   };
   for(const row of candidates){
+    const gap=previous?Math.abs(previous.y-row.y):0;
     if(row.cells.length<2){
+      const closeToPrevious=previous&&gap<=typicalHeight*1.9;
+      if(row.cells.length===1&&closeToPrevious&&appendContinuation(current,row)){
+        previous=row;
+        continue;
+      }
       if(current.length>=2)flush();
       previous=row;
       continue;
     }
-    const gap=previous?Math.abs(previous.y-row.y):0;
     const medianColumns=U().median(current.map(item=>item.cells.length))||row.cells.length;
     const columnBreak=current.length>=2&&Math.abs(row.cells.length-medianColumns)>=Math.max(3,medianColumns);
     if(current.length&&(gap>typicalHeight*2.8||columnBreak))flush();
