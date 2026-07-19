@@ -1,20 +1,30 @@
-const CACHE='explapp-pdf-studio-v22';
-const CORE=['./','./index.html','./manifest.webmanifest','./icon.svg','./core/pdf-studio-utils.js','./modules/pdf-excel-core.js','./ui/excel-preview.js','./modules/pdf-word-docx.js','./modules/images-to-pdf.js','./modules/pdf-to-html.js','./modules/pdf-markdown.js','./modules/pdf-search-advanced.js','./modules/pdf-ocr-advanced.js','./modules/pdf-tables-advanced.js','./modules/pdf-existing-tools-enhanced.js','./excel-tool.js'];
+const CACHE='explapp-pdf-studio-v23';
+const MODULE_SCRIPTS=[
+ './core/pdf-studio-utils.js',
+ './modules/pdf-excel-core.js',
+ './ui/excel-preview.js',
+ './modules/pdf-word-docx.js',
+ './modules/images-to-pdf.js',
+ './modules/pdf-to-html.js',
+ './modules/pdf-markdown.js',
+ './modules/pdf-search-advanced.js',
+ './modules/pdf-ocr-advanced.js',
+ './modules/pdf-tables-advanced.js',
+ './modules/pdf-existing-tools-enhanced.js',
+ './excel-tool.js'
+];
+const CORE=['./','./index.html','./manifest.webmanifest','./icon.svg',...MODULE_SCRIPTS];
+
+function scriptTag(path){
+ return `<script src="${path}"></script>`;
+}
 
 function patchHtml(html){
  let patched=html;
- if(!patched.includes('core/pdf-studio-utils.js'))patched=patched.replace('</body>','<script src="./core/pdf-studio-utils.js"></script></body>');
- if(!patched.includes('modules/pdf-excel-core.js'))patched=patched.replace('</body>','<script src="./modules/pdf-excel-core.js"></script></body>');
- if(!patched.includes('ui/excel-preview.js'))patched=patched.replace('</body>','<script src="./ui/excel-preview.js"></script></body>');
- if(!patched.includes('modules/pdf-word-docx.js'))patched=patched.replace('</body>','<script src="./modules/pdf-word-docx.js"></script></body>');
- if(!patched.includes('modules/images-to-pdf.js'))patched=patched.replace('</body>','<script src="./modules/images-to-pdf.js"></script></body>');
- if(!patched.includes('modules/pdf-to-html.js'))patched=patched.replace('</body>','<script src="./modules/pdf-to-html.js"></script></body>');
- if(!patched.includes('modules/pdf-markdown.js'))patched=patched.replace('</body>','<script src="./modules/pdf-markdown.js"></script></body>');
- if(!patched.includes('modules/pdf-search-advanced.js'))patched=patched.replace('</body>','<script src="./modules/pdf-search-advanced.js"></script></body>');
- if(!patched.includes('modules/pdf-ocr-advanced.js'))patched=patched.replace('</body>','<script src="./modules/pdf-ocr-advanced.js"></script></body>');
- if(!patched.includes('modules/pdf-tables-advanced.js'))patched=patched.replace('</body>','<script src="./modules/pdf-tables-advanced.js"></script></body>');
- if(!patched.includes('modules/pdf-existing-tools-enhanced.js'))patched=patched.replace('</body>','<script src="./modules/pdf-existing-tools-enhanced.js"></script></body>');
- if(!patched.includes('excel-tool.js'))patched=patched.replace('</body>','<script src="./excel-tool.js"></script></body>');
+ for(const path of MODULE_SCRIPTS){
+  const normalized=path.replace(/^\.\//,'');
+  if(!patched.includes(normalized))patched=patched.replace('</body>',`${scriptTag(path)}</body>`);
+ }
  return patched;
 }
 
