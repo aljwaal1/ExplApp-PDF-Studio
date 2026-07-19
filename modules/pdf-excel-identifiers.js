@@ -4,9 +4,21 @@
 const core=window.ExplAppPdfExcelCore;
 if(!core||typeof core.exportXlsx!=='function'||!window.XLSX)return;
 
+const arabicIndicDigits='٠١٢٣٤٥٦٧٨٩';
+const easternArabicDigits='۰۱۲۳۴۵۶۷۸۹';
+
+function normalizeIdentifierDigits(value){
+  return String(value)
+    .replace(/[٠-٩]/g,d=>String(arabicIndicDigits.indexOf(d)))
+    .replace(/[۰-۹]/g,d=>String(easternArabicDigits.indexOf(d)));
+}
+
 function asIdentifierText(value){
   if(value===null||value===undefined)return'';
-  return String(value).trim();
+  return normalizeIdentifierDigits(value)
+    .replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g,'')
+    .replace(/[\u00a0\s]+/g,' ')
+    .trim();
 }
 
 function preserveIdentifierColumns(sheet,rowCount){
