@@ -136,6 +136,21 @@ function numberCoordinates(page,text,font,size,position){
   return {x:(pw-width)/2,y:margin};
 }
 
+function rememberOperation(file,processedCount){
+  const key='explappPdfStudio:lastSession:v1';
+  try{
+    const meta=JSON.parse(localStorage.getItem(key)||'{}')||{};
+    const options={};
+    document.querySelectorAll('#options input[id],#options select[id],#options textarea[id]').forEach(el=>{
+      options[el.id]=el.type==='checkbox'?Boolean(el.checked):el.value;
+    });
+    const at=Date.now();
+    const range=options.stampPages||'كل الصفحات';
+    const description=`علامة مائية وترقيم — ${range} — ${processedCount} صفحة`;
+    localStorage.setItem(key,JSON.stringify({...meta,activeTool:'stamp',options,fileName:file?.name||meta.fileName||'',lastOperation:{tool:'stamp',toolName:'علامة مائية وترقيم',description,options,at},updatedAt:at}));
+  }catch{}
+}
+
 async function execute(){
   const file=selectedFile();
   if(!file)throw Error('اختر ملف PDF أولًا');
@@ -164,7 +179,7 @@ async function execute(){
       page.drawImage(watermarkImage,{x:box.x,y:box.y,width:box.width,height:box.height,opacity});
     }
     if(numbers){
-      const label=String(numberStart+index);
+      const label=String(numberStart+i);
       const size=10;
       const xy=numberCoordinates(page,label,font,size,numberPosition);
       page.drawText(label,{...xy,size,font,opacity:.82});
@@ -172,6 +187,7 @@ async function execute(){
   }
   const result=await doc.save({useObjectStreams:true});
   U().download(result,`${U().safeName(file.name)}-watermark-numbered.pdf`,'application/pdf');
+  rememberOperation(file,list.length);
   U().setProgress(100,'تمت إضافة العلامة المائية والترقيم');
   setTimeout(()=>U().hideProgress(),1100);
   const out=$('#results');
