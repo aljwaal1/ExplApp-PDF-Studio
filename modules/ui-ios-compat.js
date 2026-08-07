@@ -34,7 +34,7 @@ function ensurePickerButton(){
   if($('#iosFilePickerButton'))return;
   const actions=document.createElement('div');
   actions.className='ios-file-actions';
-  actions.innerHTML=`<button type="button" id="iosFilePickerButton" class="ios-file-button">📁 اختيار PDF من الملفات</button>`;
+  actions.innerHTML='<button type="button" id="iosFilePickerButton" class="ios-file-button">📁 اختيار PDF من الملفات</button>';
   drop.appendChild(actions);
   const note=document.createElement('div');
   note.className='ios-file-note';
@@ -44,10 +44,6 @@ function ensurePickerButton(){
     event.preventDefault();event.stopPropagation();
     try{input.click()}catch(error){console.error('file picker failed',error)}
   });
-  $('#iosFilePickerButton')?.addEventListener('touchend',event=>{
-    if(event.cancelable)event.preventDefault();
-    try{input.click()}catch(error){console.error('file picker touch failed',error)}
-  },{passive:false});
 }
 
 function showRuntimeWarning(message){
@@ -67,7 +63,7 @@ function checkRuntime(){
   if(!window.pdfjsLib)missing.push('PDF.js');
   if(!window.PDFLib)missing.push('PDF-Lib');
   if(missing.length){
-    showRuntimeWarning(`المكتبات غير الجاهزة: ${missing.join('، ')}. تأكد من الاتصال بالإنترنت ثم أعد التحميل.`);
+    showRuntimeWarning(`المكتبات غير الجاهزة: ${missing.join('، ')}. اتصل بالإنترنت واضغط «إعادة تحميل التطبيق» مرة واحدة.`);
     return false;
   }
   return true;
@@ -94,7 +90,7 @@ function init(){
   markEnvironment();
   ensurePickerButton();
   hardenClicks();
-  setTimeout(checkRuntime,700);
+  setTimeout(checkRuntime,900);
   const observer=new MutationObserver(()=>ensurePickerButton());
   observer.observe(document.body,{childList:true,subtree:true});
 }
