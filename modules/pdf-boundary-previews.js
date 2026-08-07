@@ -12,26 +12,27 @@ function ensureStyles(){
   const style=document.createElement('style');
   style.id='boundaryPreviewStyles';
   style.textContent=`
-    .boundary-range-title{margin-top:10px;padding:10px 12px;border-radius:11px;background:#eef3ff;color:var(--b);font-weight:800;text-align:center}
-    .boundary-preview-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
-    .boundary-preview-card{margin:0;border:1px solid var(--l);border-radius:12px;background:#fff;padding:8px;text-align:center;overflow:hidden}
-    .boundary-preview-card figcaption{font-size:12px;font-weight:800;margin-bottom:7px;color:var(--t)}
-    .boundary-preview-card canvas{display:block;max-width:100%;height:auto;margin:auto;border:1px solid #e5e9f0;border-radius:8px;background:#f7f8fb}
-    .boundary-preview-status{font-size:11px;color:var(--m);margin-top:6px;min-height:16px}
-    .split-boundary-box{margin-top:12px;border:1px solid var(--l);border-radius:14px;padding:11px;background:#fbfcff}
-    .split-boundary-note{font-size:11px;color:var(--m);text-align:center;margin-top:7px}
-    @media(max-width:620px){.boundary-preview-grid{grid-template-columns:1fr 1fr;gap:7px}.boundary-preview-card{padding:6px}.boundary-preview-card figcaption{font-size:11px}}
+    .boundary-range-title{margin-top:10px;padding:11px 13px;border-radius:12px;background:#eef3ff;color:var(--b);font-weight:800;text-align:center}
+    .boundary-preview-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;margin-top:12px}
+    .boundary-preview-card{margin:0;border:1px solid var(--l);border-radius:14px;background:#fff;padding:10px;text-align:center;overflow:hidden;min-width:0}
+    .boundary-preview-card figcaption{font-size:13px;font-weight:800;margin-bottom:8px;color:var(--t)}
+    .boundary-preview-card canvas{display:block;max-width:100%;height:auto;margin:auto;border:1px solid #e5e9f0;border-radius:9px;background:#f7f8fb;box-shadow:0 5px 18px #17203314}
+    .boundary-preview-status{font-size:11px;color:var(--m);margin-top:7px;min-height:16px}
+    .split-boundary-box{margin-top:12px;border:1px solid var(--l);border-radius:14px;padding:12px;background:#fbfcff}
+    .split-boundary-note{font-size:11px;color:var(--m);text-align:center;margin-top:8px}
+    @media(max-width:760px){
+      .boundary-preview-grid{grid-template-columns:1fr;gap:12px}
+      .boundary-preview-card{padding:9px}.boundary-preview-card figcaption{font-size:13px}
+    }
   `;
   document.head.appendChild(style);
 }
 
 function selectedPdfFile(){
-  return [...($('#files')?.files||[])].find(file=>/\.pdf$/i.test(file.name))||null;
+  return window.ExplAppSession?.getActiveFile?.()||[...($('#files')?.files||[])].find(file=>/\.pdf$/i.test(file.name))||null;
 }
 
-function signature(file){
-  return file?`${file.name}|${file.size}|${file.lastModified}`:'';
-}
+function signature(file){return file?`${file.name}|${file.size}|${file.lastModified}`:''}
 
 async function getPdf(){
   const file=selectedPdfFile();
@@ -49,11 +50,7 @@ async function getPdf(){
   try{return await loadPromise}finally{loadPromise=null}
 }
 
-function clearPdfCache(){
-  cachedPdf=null;
-  cachedSignature='';
-  loadPromise=null;
-}
+function clearPdfCache(){cachedPdf=null;cachedSignature='';loadPromise=null}
 
 async function renderThumb(pdf,pageNo,canvas,status){
   const token=String((Number(canvas.dataset.renderToken)||0)+1);
@@ -62,21 +59,30 @@ async function renderThumb(pdf,pageNo,canvas,status){
   const safePage=Math.max(1,Math.min(pdf.numPages,Math.round(Number(pageNo)||1)));
   const page=await pdf.getPage(safePage);
   const base=page.getViewport({scale:1});
-  const cssWidth=Math.min(300,Math.max(150,canvas.parentElement?.clientWidth-18||220));
+  const holder=canvas.closest('.pdf-preview-viewport')||canvas.parentElement;
+  const available=Math.max(260,(holder?.clientWidth||canvas.closest('.boundary-preview-card')?.clientWidth||560)-20);
+  const cssWidth=Math.min(720,available);
   const scale=cssWidth/base.width;
-  const pixelRatio=Math.min(1.6,window.devicePixelRatio||1);
+  const pixelRatio=Math.min(2.25,Math.max(1.35,window.devicePixelRatio||1));
   const viewport=page.getViewport({scale:scale*pixelRatio});
   const temp=document.createElement('canvas');
   temp.width=Math.max(1,Math.ceil(viewport.width));
   temp.height=Math.max(1,Math.ceil(viewport.height));
-  await page.render({canvasContext:temp.getContext('2d'),viewport}).promise;
+  const ctx=temp.getContext('2d',{alpha:false});
+  ctx.fillStyle='#fff';ctx.fillRect(0,0,temp.width,temp.height);
+  await page.render({canvasContext:ctx,viewport}).promise;
   if(canvas.dataset.renderToken!==token)return;
   canvas.width=temp.width;
   canvas.height=temp.height;
-  canvas.style.width=`${Math.round(viewport.width/pixelRatio)}px`;
-  canvas.style.height=`${Math.round(viewport.height/pixelRatio)}px`;
+  const renderedCssWidth=Math.round(viewport.width/pixelRatio);
+  const renderedCssHeight=Math.round(viewport.height/pixelRatio);
+  canvas.style.width=`${renderedCssWidth}px`;
+  canvas.style.height=`${renderedCssHeight}px`;
+  canvas.dataset.previewNaturalWidth=String(renderedCssWidth);
+  canvas.dataset.previewNaturalHeight=String(renderedCssHeight);
   canvas.getContext('2d').drawImage(temp,0,0);
-  if(status)status.textContent=`صفحة ${safePage}`;
+  canvas.dispatchEvent(new CustomEvent('explapp-preview-rendered',{bubbles:true,detail:{page:safePage,width:renderedCssWidth,height:renderedCssHeight}}));
+  if(status)status.textContent=`صفحة ${safePage} — اضغط على المعاينة لتكبيرها`;
 }
 
 function previewMarkup(prefix=''){
@@ -106,17 +112,9 @@ function prepareBookOptions(){
   const select=$('#bookStructureMode');
   if(!select||select.dataset.boundaryPrepared)return;
   select.dataset.boundaryPrepared='1';
-  const field=select.closest('.field');
-  const label=field?.querySelector('label');
+  const label=select.closest('.field')?.querySelector('label');
   if(label)label.textContent='أريد التقطيع حسب';
-  const texts={
-    auto:'تلقائي — اكتشاف Unit + Chapter + Lesson',
-    unit:'حسب الوحدة Unit — كل وحدة ملف مستقل',
-    chapter:'حسب الفصل Chapter — كل Chapter ملف مستقل',
-    lesson:'حسب الدرس Lesson — كل درس ملف مستقل',
-    part:'حسب الجزء / القسم Part / Section',
-    custom:'حسب كلمات مخصصة'
-  };
+  const texts={auto:'تلقائي — اكتشاف Unit + Chapter + Lesson',unit:'حسب الوحدة Unit — كل وحدة ملف مستقل',chapter:'حسب الفصل Chapter — كل Chapter ملف مستقل',lesson:'حسب الدرس Lesson — كل درس ملف مستقل',part:'حسب الجزء / القسم Part / Section',custom:'حسب كلمات مخصصة'};
   [...select.options].forEach(option=>{if(texts[option.value])option.textContent=texts[option.value]});
   select.value='chapter';
 }
@@ -131,18 +129,18 @@ function enhanceBookCards(){
     const box=document.createElement('div');
     box.className='book-boundary-preview';
     box.innerHTML=`<div class="boundary-range-title"></div>${previewMarkup()}`;
-    const range=card.querySelector('.book-range');
-    range?.insertAdjacentElement('beforebegin',box);
+    card.querySelector('.book-range')?.insertAdjacentElement('beforebegin',box);
+    let timer=null;
     const refresh=()=>{
-      const start=Math.max(1,Math.round(Number(startInput.value)||1));
-      const end=Math.max(start,Math.round(Number(endInput.value)||start));
-      setRangeTitle(box,start,end,end-start+1);
-      renderBoundaryBox(box,start,end).catch(()=>{});
+      clearTimeout(timer);
+      timer=setTimeout(()=>{
+        const start=Math.max(1,Math.round(Number(startInput.value)||1));
+        const end=Math.max(start,Math.round(Number(endInput.value)||start));
+        setRangeTitle(box,start,end,end-start+1);
+        renderBoundaryBox(box,start,end).catch(()=>{});
+      },100);
     };
-    startInput.addEventListener('input',refresh);
-    endInput.addEventListener('input',refresh);
-    startInput.addEventListener('change',refresh);
-    endInput.addEventListener('change',refresh);
+    ['input','change'].forEach(name=>{startInput.addEventListener(name,refresh);endInput.addEventListener(name,refresh)});
     refresh();
   });
 }
@@ -159,8 +157,7 @@ function parseSplitSelection(pdf){
 
 function installSplitPreview(){
   if(!document.querySelector('[data-tool="split"].active'))return;
-  const input=$('#pages');
-  const options=$('#options');
+  const input=$('#pages'),options=$('#options');
   if(!input||!options)return;
   let box=$('#splitBoundaryPreviewBox');
   if(!box){
@@ -173,48 +170,39 @@ function installSplitPreview(){
   if(input.dataset.boundaryPreviewBound)return;
   input.dataset.boundaryPreviewBound='1';
   let timer=null;
-  const refresh=async()=>{
+  const refresh=()=>{
     clearTimeout(timer);
     timer=setTimeout(async()=>{
       const pdf=await getPdf();
       if(!pdf)return;
       const selection=parseSplitSelection(pdf);
       if(!selection)return;
-      if(selection.error){
-        const title=box.querySelector('.boundary-range-title');
-        if(title)title.textContent='صيغة الصفحات غير صحيحة — صحح النطاق لرؤية المعاينة';
-        return;
-      }
+      if(selection.error){box.querySelector('.boundary-range-title').textContent='صيغة الصفحات غير صحيحة — صحح النطاق لرؤية المعاينة';return}
       setRangeTitle(box,selection.start,selection.end,selection.count);
       renderBoundaryBox(box,selection.start,selection.end).catch(()=>{});
-    },180);
+    },160);
   };
-  input.addEventListener('input',refresh);
-  input.addEventListener('change',refresh);
-  refresh();
+  input.addEventListener('input',refresh);input.addEventListener('change',refresh);refresh();
 }
 
-function refreshEnhancements(){
-  ensureStyles();
-  prepareBookOptions();
-  enhanceBookCards();
-  installSplitPreview();
-}
+function refreshEnhancements(){ensureStyles();prepareBookOptions();enhanceBookCards();installSplitPreview()}
 
 function init(){
   ensureStyles();
-  const options=$('#options');
-  const results=$('#results');
-  const tools=$('#tools');
-  const files=$('#files');
   const observer=new MutationObserver(()=>setTimeout(refreshEnhancements,0));
-  if(options)observer.observe(options,{childList:true,subtree:true});
-  if(results)observer.observe(results,{childList:true,subtree:true});
-  tools?.addEventListener('click',()=>setTimeout(refreshEnhancements,40));
-  files?.addEventListener('change',()=>{clearPdfCache();setTimeout(refreshEnhancements,120)});
+  if($('#options'))observer.observe($('#options'),{childList:true,subtree:true});
+  if($('#results'))observer.observe($('#results'),{childList:true,subtree:true});
+  $('#tools')?.addEventListener('click',()=>setTimeout(refreshEnhancements,40));
+  $('#files')?.addEventListener('change',()=>{clearPdfCache();setTimeout(refreshEnhancements,120)});
   $('#reset')?.addEventListener('click',()=>{clearPdfCache();setTimeout(refreshEnhancements,40)});
+  addEventListener('resize',()=>setTimeout(()=>document.querySelectorAll('.book-boundary-preview,#splitBoundaryPreviewBox').forEach(box=>{
+    const start=Number(box.querySelector('[data-boundary-status="start"]')?.textContent.match(/\d+/)?.[0]);
+    const end=Number(box.querySelector('[data-boundary-status="end"]')?.textContent.match(/\d+/)?.[0]);
+    if(start&&end)renderBoundaryBox(box,start,end).catch(()=>{});
+  }),180));
   refreshEnhancements();
 }
 
+window.ExplAppBoundaryPreviews=Object.freeze({refresh:refreshEnhancements,clearPdfCache});
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })();
