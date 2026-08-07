@@ -1,4 +1,4 @@
-const CACHE='explapp-pdf-studio-v37';
+const CACHE='explapp-pdf-studio-v38';
 const MODULE_SCRIPTS=[
  './core/pdf-studio-utils.js',
  './modules/pdf-excel-core.js',
@@ -20,6 +20,7 @@ const MODULE_SCRIPTS=[
  './modules/pdf-watermark-numbering.js',
  './modules/pdf-session-persistence.js',
  './modules/ui-app-install.js',
+ './modules/ui-ios-compat.js',
  './modules/pdf-existing-tools-enhanced.js',
  './excel-tool.js'
 ];
