@@ -1,4 +1,4 @@
-const CACHE='explapp-pdf-studio-v38';
+const CACHE='explapp-pdf-studio-v39';
 const MODULE_SCRIPTS=[
  './core/pdf-studio-utils.js',
  './modules/pdf-excel-core.js',
@@ -25,6 +25,11 @@ const MODULE_SCRIPTS=[
  './excel-tool.js'
 ];
 const CORE=['./','./index.html','./manifest.webmanifest','./icon.svg',...MODULE_SCRIPTS];
+const CRITICAL_VENDOR=[
+ 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
+ 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js',
+ 'https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js'
+];
 
 function scriptTag(path){
  return `<script src="${path}"></script>`;
@@ -49,9 +54,21 @@ function patchHtml(html){
  return `${html.slice(0,index)}${tags}${html.slice(index)}`;
 }
 
-self.addEventListener('install',event=>event.waitUntil(
- caches.open(CACHE).then(cache=>cache.addAll(CORE)).then(()=>self.skipWaiting())
-));
+async function cacheCriticalVendor(cache){
+ await Promise.allSettled(CRITICAL_VENDOR.map(async url=>{
+  try{
+   const response=await fetch(url,{mode:'cors',cache:'reload'});
+   if(response?.ok)await cache.put(url,response.clone());
+  }catch{}
+ }));
+}
+
+self.addEventListener('install',event=>event.waitUntil((async()=>{
+ const cache=await caches.open(CACHE);
+ await cache.addAll(CORE);
+ await cacheCriticalVendor(cache);
+ await self.skipWaiting();
+})()));
 
 self.addEventListener('activate',event=>event.waitUntil((async()=>{
  await Promise.all((await caches.keys()).filter(key=>key!==CACHE).map(key=>caches.delete(key)));
