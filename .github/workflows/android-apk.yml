@@ -31,7 +31,8 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      - uses: android-actions/setup-android@v3
+      - name: Verify Android SDK
+        run: test -d "$ANDROID_HOME" && echo "Android SDK available at $ANDROID_HOME"
       - name: Install Capacitor
         run: npm install --no-audit --no-fund
       - name: Prepare web assets
