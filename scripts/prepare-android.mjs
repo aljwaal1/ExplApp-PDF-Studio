@@ -41,6 +41,8 @@ for(const [remote,local] of Object.entries(scriptMap)){
   html=html.split(remote).join(local);
 }
 html=html.replace("if('serviceWorker'in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js'));","/* Native Android bundles libraries locally; no web Service Worker required. */");
+// Android-only first-paint status and runtime error diagnostics.
+html=html.replace('<body>','<body><div id="androidBootStatus" role="status" style="position:relative;z-index:10000;background:#2859d8;color:white;padding:14px;font:14px Tahoma,Arial;text-align:center;direction:rtl">جار تشغيل ExplApp PDF Studio…</div><script src="./modules/android-startup-guard.js"></script>');
 html=html.replace('</body></html>','<script src="./modules/android-native-save.js"></script></body></html>');
 await writeFile(htmlFile,html);
 const required=['vendor/pdf.min.js','vendor/pdf.worker.min.js','vendor/pdf-lib.min.js','vendor/jszip.min.js','vendor/xlsx.full.min.js','vendor/tesseract.min.js'];
