@@ -1,6 +1,12 @@
 name: Build ExplApp PDF Studio APK
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - 'package.json'
+      - 'scripts/prepare-android.mjs'
+      - 'modules/**'
+      - '.github/workflows/android-apk.yml'
   push:
     branches: [main]
     paths:
@@ -37,6 +43,15 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Prepare web assets
         run: npm run android:prepare
+      - name: Validate bundled offline libraries
+        run: |
+          test -f www/vendor/pdf.min.js
+          test -f www/vendor/pdf.worker.min.js
+          test -f www/vendor/pdf-lib.min.js
+          test -f www/vendor/xlsx.full.min.js
+          test -f www/vendor/jszip.min.js
+          test -f www/vendor/tesseract.min.js
+          ! grep -Eq '<script src="https?://' www/index.html
       - name: Generate native Android project
         run: npx cap add android
       - name: Sync web assets
@@ -57,4 +72,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           tag="android-build-${{ github.run_number }}"
-          gh release create "$tag" ExplApp-PDF-Studio-Android.apk --title "ExplApp PDF Studio Android Build ${{ github.run_number }}" --notes "Installable Android debug-signed APK built from the same web source as the PWA. External PDF libraries and OCR language downloads may require internet. Test on a physical Android device before wider distribution."
+          gh release create "$tag" ExplApp-PDF-Studio-Android.apk --title "ExplApp PDF Studio Android Build ${{ github.run_number }}" --notes "Installable Android debug-signed APK built from the same web source as the PWA. Core PDF, ZIP, Excel and OCR JavaScript runtimes are bundled. OCR languages and WASM may require internet on first use. Test on a physical Android device before wider distribution."

@@ -1,6 +1,6 @@
 {
   "name": "explapp-pdf-studio",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "scripts": {
     "android:prepare": "node scripts/prepare-android.mjs",
@@ -9,7 +9,14 @@
   },
   "dependencies": {
     "@capacitor/core": "7.4.3",
-    "@capacitor/android": "7.4.3"
+    "@capacitor/android": "7.4.3",
+    "@capacitor/filesystem": "7.1.4",
+    "@capacitor/share": "7.0.2",
+    "pdfjs-dist": "3.11.174",
+    "pdf-lib": "1.17.1",
+    "jszip": "3.10.1",
+    "xlsx": "0.18.5",
+    "tesseract.js": "5.1.1"
   },
   "devDependencies": {
     "@capacitor/cli": "7.4.3"
