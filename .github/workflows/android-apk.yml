@@ -51,6 +51,8 @@ jobs:
           test -f www/vendor/xlsx.full.min.js
           test -f www/vendor/jszip.min.js
           test -f www/vendor/tesseract.min.js
+          test -f www/modules/android-startup-guard.js
+          grep -q 'androidBootStatus' www/index.html
           ! grep -Eq '<script src="https?://' www/index.html
       - name: Generate native Android project
         run: npx cap add android
