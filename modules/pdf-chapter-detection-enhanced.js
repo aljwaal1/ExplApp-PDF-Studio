@@ -10,7 +10,7 @@ const CHAPTER_WORD_ONLY=new RegExp(`^\\s*${CHAPTER_WORD}\\s*[:.\\-–—]?\\s*$`
 const NUMBER_ONLY=new RegExp(`^\\s*(${NUMBER})\\s*$`,'iu');
 
 function clean(text){
-  return U().clean(String(text||'')).replace(/[\\u200e\\u200f\\u202a-\\u202e]/g,'').trim();
+  return U().clean(String(text||'')).replace(/[\u200e\u200f\u202a-\u202e]/g,'').trim();
 }
 
 function normalizeChapterText(text){
@@ -204,7 +204,7 @@ function ensureChapterOptions(){
 }
 
 function exportSettings(totalPages){
-  return {includeCover:$('#chapterIncludeCover')?.checked!==false,coverPage:Math.max(1,Math.min(totalPages,Math.round(Number($('#chapterCoverPage')?.value||1)))};
+  return {includeCover:$('#chapterIncludeCover')?.checked!==false,coverPage:Math.max(1,Math.min(totalPages,Math.round(Number($('#chapterCoverPage')?.value||1))))};
 }
 
 async function sectionBytes(sourceBytes,from,to,{includeCover=false,coverPage=1}={}){
