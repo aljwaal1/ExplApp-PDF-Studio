@@ -39,7 +39,7 @@ assert.equal(patchedTwice,patched,'حقن وحدات PWA يجب أن يكون آ
 
 // Every module must load on the first visit, including before the service worker takes control.
 const page=read('index.html');
-const modulePaths=[...sw.match(/const MODULE_SCRIPTS=\\[([\\s\\S]*?)\\];/)?.[1]?.matchAll(/'([^']+)'/g)||[]].map(match=>match[1]);
+const modulePaths=[...sw.match(/const MODULE_SCRIPTS=\[([\s\S]*?)\];/)?.[1]?.matchAll(/'([^']+)'/g)||[]].map(match=>match[1]);
 assert.ok(modulePaths.length>=15,'قائمة الوحدات غير مكتملة');
 for(const modulePath of modulePaths){
   const occurrences=page.split('<script src="'+modulePath+'"></script>').length-1;
