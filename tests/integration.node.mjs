@@ -37,6 +37,16 @@ assert.ok(firstModule<finalBody,'يجب حقن وحدات PWA قبل وسم body
 const patchedTwice=vm.runInContext(`patchHtml(${JSON.stringify(patched)})`,sandbox);
 assert.equal(patchedTwice,patched,'حقن وحدات PWA يجب أن يكون آمنًا عند التكرار');
 
+// Every module must load on the first visit, including before the service worker takes control.
+const page=read('index.html');
+const modulePaths=[...sw.match(/const MODULE_SCRIPTS=\\[([\\s\\S]*?)\\];/)?.[1]?.matchAll(/'([^']+)'/g)||[]].map(match=>match[1]);
+assert.ok(modulePaths.length>=15,'قائمة الوحدات غير مكتملة');
+for(const modulePath of modulePaths){
+  const occurrences=page.split('<script src="'+modulePath+'"></script>').length-1;
+  assert.equal(occurrences,1,'يجب تحميل الوحدة مباشرة مرة واحدة: '+modulePath);
+}
+assert.ok(page.indexOf('modules/pdf-existing-tools-enhanced.js')>page.indexOf('core/pdf-studio-utils.js'),'ترتيب الوحدات غير صحيح');
+
 const word=read('modules/pdf-word-docx.js');
 assert.ok(word.includes('[data-tool="word"]'),'زر Word غير مربوط بوحدة DOCX');
 assert.ok(word.includes('stopImmediatePropagation'),'وحدة Word لا تمنع المحول القديم من العمل بالتوازي');
