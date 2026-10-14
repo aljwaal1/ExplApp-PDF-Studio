@@ -10,7 +10,7 @@ const CHAPTER_WORD_ONLY=new RegExp(`^\\s*${CHAPTER_WORD}\\s*[:.\\-–—]?\\s*$`
 const NUMBER_ONLY=new RegExp(`^\\s*(${NUMBER})\\s*$`,'iu');
 
 function clean(text){
-  return U().clean(String(text||'')).replace(/[\\u200e\\u200f\\u202a-\\u202e]/g,'').trim();
+  return U().clean(String(text||'')).replace(/[\u200e\u200f\u202a-\u202e]/g,'').trim();
 }
 
 function normalizeChapterText(text){
