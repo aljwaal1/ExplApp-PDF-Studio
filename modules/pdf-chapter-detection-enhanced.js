@@ -204,7 +204,7 @@ function ensureChapterOptions(){
 }
 
 function exportSettings(totalPages){
-  return {includeCover:$('#chapterIncludeCover')?.checked!==false,coverPage:Math.max(1,Math.min(totalPages,Math.round(Number($('#chapterCoverPage')?.value||1)))};
+  return {includeCover:$('#chapterIncludeCover')?.checked!==false,coverPage:Math.max(1,Math.min(totalPages,Math.round(Number($('#chapterCoverPage')?.value||1))))};
 }
 
 async function sectionBytes(sourceBytes,from,to,{includeCover=false,coverPage=1}={}){
