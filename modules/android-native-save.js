@@ -14,19 +14,25 @@ const toBase64=async blob=>{
  for(let i=0;i<bytes.length;i+=size)parts.push(String.fromCharCode(...bytes.subarray(i,i+size)));
  return btoa(parts.join(''));
 };
-document.addEventListener('click',async event=>{
+const bypass=new WeakSet();
+document.addEventListener('click',event=>{
  const anchor=event.target?.closest?.('a[download]');
- if(!anchor||!anchor.href.startsWith('blob:')||busy)return;
- // Very large files remain on browser fallback to avoid excessive RAM usage.
- const response=await fetch(anchor.href).catch(()=>null);
- if(!response?.ok)return;
- const blob=await response.blob();
- if(blob.size>35*1024*1024)return;
+ if(!anchor||!anchor.href.startsWith('blob:')||busy||bypass.has(anchor))return;
+ // Cancel immediately; awaiting first would let WebView start the unreliable browser download.
  event.preventDefault();
  event.stopImmediatePropagation();
+ const fallback=()=>{
+   bypass.add(anchor);
+   anchor.click();
+   bypass.delete(anchor);
+ };
  busy=true;
- const name=(anchor.download||'document.pdf').replace(/[\\/:*?"<>|]/g,'_');
- try{
+ (async()=>{
+  const response=await fetch(anchor.href);
+  if(!response.ok)throw Error('Unable to read generated file');
+  const blob=await response.blob();
+  if(blob.size>35*1024*1024){fallback();return;}
+  const name=(anchor.download||'document.pdf').replace(/[\\\\/:*?"<>|]/g,'_');
   show('تجهيز الملف للحفظ أو المشاركة في Android…');
   const data=await toBase64(blob);
   const path='pdf-studio/'+Date.now()+'-'+name;
@@ -34,16 +40,10 @@ document.addEventListener('click',async event=>{
   const uri=await fs.getUri({path,directory:'CACHE'});
   await share.share({title:name,url:uri.uri,dialogTitle:'حفظ أو مشاركة '+name});
   show('اختر تطبيق الملفات أو وجهة المشاركة لحفظ الناتج');
- }catch(error){
+ })().catch(error=>{
   console.error('Android native save failed',error);
-  show('تعذر فتح نافذة الحفظ؛ استخدم طريقة التنزيل البديلة.');
-  // Trigger original download through a detached link, without intercepting repeatedly.
-  const fallback=document.createElement('a');
-  fallback.href=anchor.href;
-  fallback.download=name;
-  document.body.appendChild(fallback);
-  fallback.click();
-  fallback.remove();
- }finally{busy=false;}
+  show('تعذر فتح نافذة الحفظ؛ جاري محاولة التنزيل البديل.');
+  fallback();
+ }).finally(()=>{busy=false;});
 },true);
 })();
