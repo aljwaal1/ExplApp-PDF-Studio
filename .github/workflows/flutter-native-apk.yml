@@ -33,7 +33,7 @@ jobs:
         run: flutter create --platforms android --org com.explapp --project-name explapp_pdf_studio .
       - name: Configure PDFBox for Android
         run: |
-          cp android_native/MainActivity.kt android/app/src/main/kotlin/com/explapp/pdfstudio/MainActivity.kt
+          cp android_native/MainActivity.kt android/app/src/main/kotlin/com/explapp/explapp_pdf_studio/MainActivity.kt
           sed -i '/dependencies {/a\    implementation("com.tom-roush:pdfbox-android:2.0.27.0")' android/app/build.gradle.kts
       - name: Get dependencies
         run: flutter pub get
