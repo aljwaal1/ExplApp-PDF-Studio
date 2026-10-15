@@ -1,4 +1,4 @@
-package com.explapp.pdfstudio
+package com.explapp.explapp_pdf_studio
 
 import android.os.Bundle
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
