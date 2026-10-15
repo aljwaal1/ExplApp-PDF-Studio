@@ -1,0 +1,55 @@
+name: Build Flutter Native Android APK
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'flutter_native/**'
+      - '.github/workflows/flutter-native-apk.yml'
+  pull_request:
+    paths:
+      - 'flutter_native/**'
+      - '.github/workflows/flutter-native-apk.yml'
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    defaults:
+      run:
+        working-directory: flutter_native
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Generate native Android project
+        run: flutter create --platforms android --org com.explapp --project-name explapp_pdf_studio .
+      - name: Configure PDFBox for Android
+        run: |
+          cp android_native/MainActivity.kt android/app/src/main/kotlin/com/explapp/pdfstudio/MainActivity.kt
+          sed -i '/dependencies {/a\    implementation("com.tom-roush:pdfbox-android:2.0.27.0")' android/app/build.gradle.kts
+      - name: Get dependencies
+        run: flutter pub get
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos
+      - name: Build Android APK
+        run: flutter build apk --debug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ExplApp-Flutter-Native-APK
+          path: flutter_native/build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 30
+      - name: Publish native Android release
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="flutter-native-${{ github.run_number }}"
+          gh release create "$tag" build/app/outputs/flutter-apk/app-debug.apk --title "ExplApp PDF Studio Flutter Native ${{ github.run_number }}" --notes "Flutter/Dart native UI, Kotlin + Android PDFBox for offline merge, extract and rotate. Debug test build; more tools will follow."
