@@ -39,6 +39,8 @@ jobs:
         run: flutter pub get
       - name: Analyze
         run: flutter analyze --no-fatal-infos
+      - name: Run Flutter widget tests
+        run: flutter test
       - name: Build Android APK
         run: flutter build apk --debug
       - uses: actions/upload-artifact@v4
