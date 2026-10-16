@@ -9,7 +9,9 @@ void main() {
     expect(find.text('أدوات PDF أصلية'), findsOneWidget);
     expect(find.text('دمج ملفات PDF'), findsOneWidget);
     expect(find.text('حذف صفحات محددة'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('بحث نصي داخل PDF'), 200, scrollable: find.byType(Scrollable).first);
     expect(find.text('بحث نصي داخل PDF'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('حذف الصفحات البيضاء'), 200, scrollable: find.byType(Scrollable).first);
     expect(find.text('حذف الصفحات البيضاء'), findsOneWidget);
     expect(find.byType(ListView), findsOneWidget);
   });
