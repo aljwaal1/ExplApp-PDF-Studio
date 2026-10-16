@@ -21,6 +21,9 @@ import java.util.zip.ZipOutputStream
 import java.util.zip.ZipEntry
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Color
 import com.tom_roush.pdfbox.pdmodel.PDPageContentStream
 import com.tom_roush.pdfbox.pdmodel.common.PDRectangle
 import com.tom_roush.pdfbox.pdmodel.graphics.image.LosslessFactory
@@ -402,15 +405,28 @@ class MainActivity : FlutterActivity() {
                                 source.save(target)
                             }
                             "watermark" -> PDDocument.load(File(inputs[0])).use { source ->
-                                require(query.isNotBlank() && query.all { it.code in 32..126 }) { "الإصدار الحالي يدعم علامة مائية لاتينية فقط" }
+                                require(query.isNotBlank()) { "أدخل نص العلامة المائية" }
                                 source.pages.forEach { page ->
-                                    PDPageContentStream(source, page, AppendMode.APPEND, true, true).use { stream ->
-                                        stream.beginText()
-                                        stream.setFont(PDType1Font.HELVETICA_BOLD, 20f)
-                                        stream.newLineAtOffset(30f, page.mediaBox.height / 2f)
-                                        stream.showText(query.take(55))
-                                        stream.endText()
-                                    }
+                                    val w = 1200
+                                    val h = 200
+                                    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+                                    try {
+                                        val canvas = Canvas(bitmap)
+                                        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                                            color = Color.argb(75, 55, 75, 110)
+                                            textSize = 68f
+                                            textAlign = Paint.Align.CENTER
+                                            typeface = android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.BOLD)
+                                        }
+                                        val value = query.take(65)
+                                        canvas.drawText(value, w / 2f, h / 2f - (paint.ascent() + paint.descent()) / 2f, paint)
+                                        val image = LosslessFactory.createFromImage(source, bitmap)
+                                        val width = page.mediaBox.width * 0.78f
+                                        val height = width * h / w
+                                        PDPageContentStream(source, page, AppendMode.APPEND, true, true).use { stream ->
+                                            stream.drawImage(image, page.mediaBox.lowerLeftX + (page.mediaBox.width-width)/2f, page.mediaBox.lowerLeftY+(page.mediaBox.height-height)/2f, width, height)
+                                        }
+                                    } finally { bitmap.recycle() }
                                 }
                                 source.save(target)
                             }
