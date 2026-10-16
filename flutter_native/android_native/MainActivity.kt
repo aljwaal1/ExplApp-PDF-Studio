@@ -97,7 +97,7 @@ class MainActivity : FlutterActivity() {
                                     stripper.endPage = p
                                     val text = stripper.getText(source)
                                     if (text.contains(query, ignoreCase = true)) {
-                                        matches.add("الصفحة $p: " + text.replace("\\s+".toRegex(), " ").take(300))
+                                        matches.add("الصفحة $p: " + text.replace("\s+".toRegex(), " ").take(300))
                                     }
                                 }
                                 target.writeText(if (matches.isEmpty()) "لا توجد نتائج" else matches.joinToString("\n\n"), StandardCharsets.UTF_8)
@@ -208,13 +208,13 @@ class MainActivity : FlutterActivity() {
                                 val differences = (0 until maxOf(a.size, b.size)).mapNotNull { i ->
                                     val left = a.getOrNull(i).orEmpty()
                                     val right = b.getOrNull(i).orEmpty()
-                                    if (left == right) null else "السطر ${i + 1}\\nالأول: $left\\nالثاني: $right"
+                                    if (left == right) null else "السطر ${i + 1}\nالأول: $left\nالثاني: $right"
                                 }
-                                target.writeText(if (differences.isEmpty()) "لا توجد اختلافات نصية" else differences.joinToString("\\n\\n"), StandardCharsets.UTF_8)
+                                target.writeText(if (differences.isEmpty()) "لا توجد اختلافات نصية" else differences.joinToString("\n\n"), StandardCharsets.UTF_8)
                             }
                             "chapters" -> PDDocument.load(File(inputs[0])).use { source ->
                                 val extractor = PDFTextStripper()
-                                val heading = Regex("^(?:الفصل|الباب|الوحدة|القسم|الدرس|chapter|section|part|unit)\\b", RegexOption.IGNORE_CASE)
+                                val heading = Regex("^(?:الفصل|الباب|الوحدة|القسم|الدرس|chapter|section|part|unit)\b", RegexOption.IGNORE_CASE)
                                 val rows = mutableListOf("page,title")
                                 for (i in 1..source.numberOfPages) {
                                     extractor.startPage = i
@@ -223,15 +223,15 @@ class MainActivity : FlutterActivity() {
                                         rows.add("$i," + csv(line))
                                     }
                                 }
-                                target.writeText(rows.joinToString("\\n"), StandardCharsets.UTF_8)
+                                target.writeText(rows.joinToString("\n"), StandardCharsets.UTF_8)
                             }
                             "tables" -> PDDocument.load(File(inputs[0])).use { source ->
                                 val text = PDFTextStripper().getText(source)
-                                val rows = text.lines().map { it.trim() }.filter { it.contains(Regex("\\s{2,}|\\t")) }.map { line ->
-                                    line.split(Regex("\\s{2,}|\\t")).joinToString(",") { csv(it) }
+                                val rows = text.lines().map { it.trim() }.filter { it.contains(Regex("\s{2,}|\t")) }.map { line ->
+                                    line.split(Regex("\s{2,}|\t")).joinToString(",") { csv(it) }
                                 }
                                 require(rows.isNotEmpty()) { "لا توجد صفوف قابلة للتقسيم؛ يلزم استخراج جداول متقدم أو OCR" }
-                                target.writeText(rows.joinToString("\\n"), StandardCharsets.UTF_8)
+                                target.writeText(rows.joinToString("\n"), StandardCharsets.UTF_8)
                             }
                             "batch" -> {
                                 require(inputs.isNotEmpty()) { "اختر ملف PDF واحدًا على الأقل" }
@@ -260,7 +260,7 @@ class MainActivity : FlutterActivity() {
             }
     }
 
-    private fun csv(s: String): String = "\\"" + s.replace("\\"", "\\"\\"") + "\\""
+    private fun csv(s: String): String = "\"" + s.replace("\"", "\"\"") + "\""
 
     private fun htmlEscape(value: String): String = value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;").replace("'", "&apos;")
 
