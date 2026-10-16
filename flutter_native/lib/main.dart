@@ -132,7 +132,7 @@ class _StudioHomeState extends State<StudioHome> {
       ('chapterpdf','تقسيم فصول الكتاب PDF ZIP',Icons.auto_stories_outlined),
       ('batchmerge','دمج جماعي لملفات PDF',Icons.library_add_outlined),
       ('number','ترقيم صفحات PDF',Icons.format_list_numbered),
-      ('watermark','علامة مائية نصية إنجليزية',Icons.branding_watermark),
+      ('watermark','علامة مائية عربية وإنجليزية',Icons.branding_watermark),
     ];
     return Scaffold(
       appBar: AppBar(title: const Text('ExplApp PDF Studio'),centerTitle:true),
@@ -165,7 +165,7 @@ class _StudioHomeState extends State<StudioHome> {
         ...files.map((f)=>ListTile(dense:true,leading:const Icon(Icons.picture_as_pdf),title:Text(f.split('/').last,maxLines:1,overflow:TextOverflow.ellipsis))),
         if (mode=='split' || mode=='delete' || mode=='reorder') TextField(controller:pages,decoration:InputDecoration(labelText:mode=='delete'?'الصفحات المراد حذفها':mode=='reorder'?'الترتيب الجديد لكل الصفحات':'الصفحات المراد استخراجها',helperText:mode=='reorder'?'مثال لملف من 4 صفحات: 3,1,4,2':'مثال: 1-3,5'),keyboardType:TextInputType.text),
         if (mode=='markdown' || mode=='html' || mode=='docx' || mode=='tables') const Padding(padding:EdgeInsets.symmetric(vertical:8),child:Text('تحويل النصوص القابلة للاستخراج فقط؛ لا يحافظ هذا الإصدار على التخطيط والصور والجداول الأصلية.')),
-        if (mode=='watermark') TextField(controller:query,decoration:const InputDecoration(labelText:'نص العلامة المائية (أحرف لاتينية)')),
+        if (mode=='watermark') TextField(controller:query,decoration:const InputDecoration(labelText:'نص العلامة المائية (عربي أو إنجليزي)')),
         if (mode=='search') TextField(controller:query,decoration:const InputDecoration(labelText:'الكلمة أو العبارة المراد البحث عنها')),
         if (mode=='blank') const Padding(padding:EdgeInsets.symmetric(vertical:8),child:Text('سيُفحص محتوى الصفحات بصريًا بدقة منخفضة. تأكد من الملف الناتج قبل حذف الأصل.')),
         if (mode=='rotate') DropdownButtonFormField<String>(
