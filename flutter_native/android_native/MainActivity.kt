@@ -1,12 +1,17 @@
 package com.explapp.explapp_pdf_studio
 
 import android.os.Bundle
+import android.app.Activity
+import android.content.Intent
+import android.net.Uri
+import java.io.FileInputStream
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import com.tom_roush.pdfbox.multipdf.PDFMergerUtility
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.pdmodel.PDPage
 import com.tom_roush.pdfbox.text.PDFTextStripper
 import com.tom_roush.pdfbox.rendering.PDFRenderer
+import com.googlecode.tesseract.android.TessBaseAPI
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -17,11 +22,45 @@ import java.util.zip.ZipOutputStream
 import java.util.zip.ZipEntry
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Color
 import com.tom_roush.pdfbox.pdmodel.PDPageContentStream
 import com.tom_roush.pdfbox.pdmodel.common.PDRectangle
 import com.tom_roush.pdfbox.pdmodel.graphics.image.LosslessFactory
+import com.tom_roush.pdfbox.pdmodel.font.PDType1Font
+import com.tom_roush.pdfbox.pdmodel.PDPageContentStream.AppendMode
 
 class MainActivity : FlutterActivity() {
+    private var pendingSave: io.flutter.plugin.common.MethodChannel.Result? = null
+    private var pendingSource: File? = null
+    private val saveRequestCode = 64081
+
+    @Deprecated("Android activity callback")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != saveRequestCode) return
+        val callback = pendingSave ?: return
+        val source = pendingSource
+        pendingSave = null
+        pendingSource = null
+        val uri = data?.data
+        if (resultCode != Activity.RESULT_OK || uri == null || source == null) {
+            callback.success(null)
+            return
+        }
+        Thread {
+            try {
+                contentResolver.openOutputStream(uri)?.use { output ->
+                    FileInputStream(source).use { it.copyTo(output) }
+                } ?: error("تعذر فتح مسار الحفظ")
+                runOnUiThread { callback.success(uri.toString()) }
+            } catch (e: Exception) {
+                runOnUiThread { callback.error("SAVE_ERROR", e.message ?: "خطأ أثناء الحفظ", null) }
+            }
+        }.start()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         PDFBoxResourceLoader.init(applicationContext)
@@ -31,6 +70,51 @@ class MainActivity : FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.explapp.pdfstudio/native_pdf")
             .setMethodCallHandler { call, result ->
+                if (call.method == "preview") {
+                    val source = File(call.argument<String>("source") ?: "")
+                    val page = call.argument<Int>("page") ?: 1
+                    Thread {
+                        try {
+                            require(source.isFile) { "ملف المعاينة غير موجود" }
+                            PDDocument.load(source).use { pdf ->
+                                require(page in 1..pdf.numberOfPages) { "صفحة غير موجودة" }
+                                val bitmap = PDFRenderer(pdf).renderImageWithDPI(page - 1, 105f)
+                                val preview = File(cacheDir, "preview-${System.nanoTime()}.png")
+                                try {
+                                    FileOutputStream(preview).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                                } finally { bitmap.recycle() }
+                                val value = mapOf("path" to preview.absolutePath, "total" to pdf.numberOfPages)
+                                runOnUiThread { result.success(value) }
+                            }
+                        } catch (e: Exception) {
+                            runOnUiThread { result.error("PREVIEW_ERROR", e.message, null) }
+                        }
+                    }.start()
+                    return@setMethodCallHandler
+                }
+                if (call.method == "saveAs") {
+                    if (pendingSave != null) { result.error("BUSY", "يوجد طلب حفظ مفتوح", null); return@setMethodCallHandler }
+                    val source = File(call.argument<String>("source") ?: "")
+                    if (!source.isFile) { result.error("INVALID_SOURCE", "ملف النتيجة غير موجود", null); return@setMethodCallHandler }
+                    val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                        addCategory(Intent.CATEGORY_OPENABLE)
+                        type = when(source.extension.lowercase()) {
+                            "pdf" -> "application/pdf"
+                            "txt" -> "text/plain"
+                            "csv" -> "text/csv"
+                            "html" -> "text/html"
+                            "docx" -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                            "zip" -> "application/zip"
+                            else -> "application/octet-stream"
+                        }
+                        putExtra(Intent.EXTRA_TITLE, source.name)
+                    }
+                    pendingSave = result
+                    pendingSource = source
+                    try { startActivityForResult(intent, saveRequestCode) }
+                    catch(e: Exception) { pendingSave = null; pendingSource = null; result.error("SAVE_ERROR", e.message, null) }
+                    return@setMethodCallHandler
+                }
                 if (call.method != "process") { result.notImplemented(); return@setMethodCallHandler }
                 val op = call.argument<String>("operation") ?: ""
                 val inputs = call.argument<List<String>>("inputs") ?: emptyList()
@@ -233,6 +317,67 @@ class MainActivity : FlutterActivity() {
                                 require(rows.isNotEmpty()) { "لا توجد صفوف قابلة للتقسيم؛ يلزم استخراج جداول متقدم أو OCR" }
                                 target.writeText(rows.joinToString("\n"), StandardCharsets.UTF_8)
                             }
+                            "ocr" -> PDDocument.load(File(inputs[0])).use { source ->
+                                val tessRoot = File(filesDir, "ocr-models")
+                                val tessData = File(tessRoot, "tessdata")
+                                tessData.mkdirs()
+                                listOf("ara", "eng").forEach { language ->
+                                    val model = File(tessData, "$language.traineddata")
+                                    if (!model.isFile) {
+                                        assets.open("tessdata/$language.traineddata").use { input ->
+                                            model.outputStream().use { output -> input.copyTo(output) }
+                                        }
+                                    }
+                                }
+                                val tess = TessBaseAPI()
+                                require(tess.init(tessRoot.absolutePath, "ara+eng")) { "تعذر بدء محرك OCR" }
+                                try {
+                                    val renderer = PDFRenderer(source)
+                                    val pageTexts = mutableListOf<String>()
+                                    for (i in 0 until source.numberOfPages) {
+                                        val bitmap = renderer.renderImageWithDPI(i, 180f)
+                                        try {
+                                            tess.setImage(bitmap)
+                                            pageTexts.add("===== صفحة ${i + 1} =====\n" + (tess.getUTF8Text() ?: ""))
+                                            tess.clear()
+                                        } finally { bitmap.recycle() }
+                                    }
+                                    target.writeText(pageTexts.joinToString("\n\n"), StandardCharsets.UTF_8)
+                                } finally { tess.recycle() }
+                            }
+                            "xlsx" -> PDDocument.load(File(inputs[0])).use { source ->
+                                val text = PDFTextStripper().getText(source)
+                                val parsed = text.lines().map { it.trim() }
+                                    .filter { it.contains(Regex("\\s{2,}|\\t")) }
+                                    .map { it.split(Regex("\\s{2,}|\\t")) }
+                                require(parsed.isNotEmpty()) { "لم يتم اكتشاف صفوف قابلة للتقسيم؛ هذا المحول تجريبي" }
+                                val xml = buildString {
+                                    append("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>")
+                                    append("<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData>")
+                                    parsed.forEachIndexed { index, cells ->
+                                        append("<row r=\"${index + 1}\">")
+                                        cells.forEach { cell ->
+                                            append("<c t=\"inlineStr\"><is><t>")
+                                            append(htmlEscape(cell))
+                                            append("</t></is></c>")
+                                        }
+                                        append("</row>")
+                                    }
+                                    append("</sheetData></worksheet>")
+                                }
+                                ZipOutputStream(FileOutputStream(target)).use { zip ->
+                                    fun entry(name: String, content: String) {
+                                        zip.putNextEntry(ZipEntry(name))
+                                        zip.write(content.toByteArray(StandardCharsets.UTF_8))
+                                        zip.closeEntry()
+                                    }
+                                    entry("[Content_Types].xml", "<?xml version=\"1.0\"?><Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\"><Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/><Default Extension=\"xml\" ContentType=\"application/xml\"/><Override PartName=\"/xl/workbook.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml\"/><Override PartName=\"/xl/worksheets/sheet1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml\"/></Types>")
+                                    entry("_rels/.rels", "<?xml version=\"1.0\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"xl/workbook.xml\"/></Relationships>")
+                                    entry("xl/workbook.xml", "<?xml version=\"1.0\"?><workbook xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\"><sheets><sheet name=\"Export\" sheetId=\"1\" r:id=\"rId1\"/></sheets></workbook>")
+                                    entry("xl/_rels/workbook.xml.rels", "<?xml version=\"1.0\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"worksheets/sheet1.xml\"/></Relationships>")
+                                    entry("xl/worksheets/sheet1.xml", xml)
+                                }
+                            }
                             "batch" -> {
                                 require(inputs.isNotEmpty()) { "اختر ملف PDF واحدًا على الأقل" }
                                 ZipOutputStream(FileOutputStream(target)).use { zip ->
@@ -244,6 +389,75 @@ class MainActivity : FlutterActivity() {
                                         zip.closeEntry()
                                     }
                                 }
+                            }
+                            "batchmerge" -> {
+                                require(inputs.size >= 2) { "اختر ملفين على الأقل" }
+                                val merger = PDFMergerUtility()
+                                inputs.forEach { merger.addSource(File(it)) }
+                                merger.destinationFileName = dest
+                                merger.mergeDocuments(null)
+                            }
+                            "chapterpdf" -> PDDocument.load(File(inputs[0])).use { source ->
+                                val extractor = PDFTextStripper()
+                                val heading = Regex("^(الفصل|الباب|الوحدة|القسم|الدرس|chapter|section|part|unit)(\\s|[:：]|$)", RegexOption.IGNORE_CASE)
+                                val starts = mutableListOf(0)
+                                for (i in 0 until source.numberOfPages) {
+                                    extractor.startPage = i + 1
+                                    extractor.endPage = i + 1
+                                    val lines = extractor.getText(source).lines().take(20).map { it.trim() }
+                                    if (i > 0 && lines.any { it.length in 3..120 && heading.containsMatchIn(it) }) starts.add(i)
+                                }
+                                val boundaries = starts.distinct().sorted() + source.numberOfPages
+                                ZipOutputStream(FileOutputStream(target)).use { zip ->
+                                    for (part in 0 until boundaries.size - 1) {
+                                        PDDocument().use { section ->
+                                            for (i in boundaries[part] until boundaries[part + 1]) section.importPage(source.getPage(i))
+                                            val buffer = java.io.ByteArrayOutputStream()
+                                            section.save(buffer)
+                                            zip.putNextEntry(ZipEntry("chapter-${part + 1}.pdf"))
+                                            zip.write(buffer.toByteArray())
+                                            zip.closeEntry()
+                                        }
+                                    }
+                                }
+                            }
+                            "number" -> PDDocument.load(File(inputs[0])).use { source ->
+                                source.pages.forEachIndexed { i, page ->
+                                    PDPageContentStream(source, page, AppendMode.APPEND, true, true).use { stream ->
+                                        stream.beginText()
+                                        stream.setFont(PDType1Font.HELVETICA, 12f)
+                                        stream.newLineAtOffset(page.mediaBox.width / 2f, 20f)
+                                        stream.showText((i + 1).toString())
+                                        stream.endText()
+                                    }
+                                }
+                                source.save(target)
+                            }
+                            "watermark" -> PDDocument.load(File(inputs[0])).use { source ->
+                                require(query.isNotBlank()) { "أدخل نص العلامة المائية" }
+                                source.pages.forEach { page ->
+                                    val w = 1200
+                                    val h = 200
+                                    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+                                    try {
+                                        val canvas = Canvas(bitmap)
+                                        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                                            color = Color.argb(75, 55, 75, 110)
+                                            textSize = 68f
+                                            textAlign = Paint.Align.CENTER
+                                            typeface = android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.BOLD)
+                                        }
+                                        val value = query.take(65)
+                                        canvas.drawText(value, w / 2f, h / 2f - (paint.ascent() + paint.descent()) / 2f, paint)
+                                        val image = LosslessFactory.createFromImage(source, bitmap)
+                                        val width = page.mediaBox.width * 0.78f
+                                        val height = width * h / w
+                                        PDPageContentStream(source, page, AppendMode.APPEND, true, true).use { stream ->
+                                            stream.drawImage(image, page.mediaBox.lowerLeftX + (page.mediaBox.width-width)/2f, page.mediaBox.lowerLeftY+(page.mediaBox.height-height)/2f, width, height)
+                                        }
+                                    } finally { bitmap.recycle() }
+                                }
+                                source.save(target)
                             }
                             "rotate" -> PDDocument.load(File(inputs[0])).use { source ->
                                 require(degrees in listOf(90,180,270)) { "زاوية التدوير غير صحيحة" }

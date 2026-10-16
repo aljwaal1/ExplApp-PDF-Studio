@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:open_filex/open_filex.dart';
+import 'package:flutter/rendering.dart';
 
 void main() => runApp(const PdfStudioApp());
 const channel = MethodChannel('com.explapp.pdfstudio/native_pdf');
@@ -32,6 +33,9 @@ class _StudioHomeState extends State<StudioHome> {
   bool busy = false;
   String? result;
   String? error;
+  String? previewPath;
+  int previewPage = 1;
+  int previewTotal = 0;
   final pages = TextEditingController(text: '1');
   final rotation = TextEditingController(text: '90');
   final query = TextEditingController();
@@ -42,11 +46,42 @@ class _StudioHomeState extends State<StudioHome> {
   Future<void> pick() async {
     final picked = await FilePicker.platform.pickFiles(
       type: FileType.custom, allowedExtensions: mode == 'imagespdf' ? ['png','jpg','jpeg'] : ['pdf'],
-      allowMultiple: mode == 'merge' || mode == 'imagespdf' || mode == 'compare' || mode == 'batch', withData: false,
+      allowMultiple: mode == 'merge' || mode == 'imagespdf' || mode == 'compare' || mode == 'batch' || mode == 'batchmerge', withData: false,
     );
     if (picked == null) return;
     final paths = picked.files.map((f) => f.path).whereType<String>().toList();
-    setState(() {files..clear()..addAll(paths); result = null; error = null;});
+    setState(() {files..clear()..addAll(paths); result = null; error = null; previewPath = null; previewPage = 1; previewTotal = 0;});
+  }
+
+  Future<void> preview({int page = 1}) async {
+    if (files.isEmpty || busy) return;
+    setState(() => busy = true);
+    try {
+      final response = await channel.invokeMapMethod<String, dynamic>('preview', {'source': files.first, 'page': page});
+      if (!mounted) return;
+      setState(() {
+        previewPath = response?['path'] as String?;
+        previewTotal = response?['total'] as int? ?? 0;
+        previewPage = page;
+        error = null;
+      });
+    } catch (e) {
+      if (mounted) setState(() => error = 'تعذر عرض معاينة PDF: $e');
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  Future<void> saveAs() async {
+    if (result == null) return;
+    try {
+      final saved = await channel.invokeMethod<String>('saveAs', {'source': result});
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(saved == null ? 'لم يتم الحفظ' : 'تم الحفظ في الموقع الذي اخترته')));
+    } on PlatformException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message ?? 'تعذر حفظ الملف')));
+    }
   }
 
   Future<void> execute() async {
@@ -55,7 +90,7 @@ class _StudioHomeState extends State<StudioHome> {
     setState(() {busy = true; result = null; error = null;});
     try {
       final folder = await getApplicationDocumentsDirectory();
-      final extension = <String,String>{'text':'txt','search':'txt','render':'zip','markdown':'md','html':'html','docx':'docx','compare':'txt','chapters':'csv','tables':'csv','batch':'zip'}[mode] ?? 'pdf';
+      final extension = <String,String>{'text':'txt','search':'txt','render':'zip','markdown':'md','html':'html','docx':'docx','compare':'txt','chapters':'csv','tables':'csv','batch':'zip','ocr':'txt','chapterpdf':'zip','batchmerge':'pdf','xlsx':'xlsx'}[mode] ?? 'pdf';
       final name = 'ExplApp-${mode}-${DateTime.now().millisecondsSinceEpoch}.$extension';
       final path = '${folder.path}/$name';
       await channel.invokeMethod<void>('process', {
@@ -92,7 +127,13 @@ class _StudioHomeState extends State<StudioHome> {
       ('compare','مقارنة نصية لملفين',Icons.compare_arrows),
       ('chapters','فهرسة عناوين الفصول CSV',Icons.menu_book_outlined),
       ('tables','استخراج صفوف CSV مبدئي',Icons.table_chart_outlined),
+      ('xlsx','استخراج صفوف إلى Excel XLSX',Icons.grid_on_outlined),
+      ('ocr','OCR عربي وإنجليزي (دون إنترنت)',Icons.document_scanner_outlined),
       ('batch','استخراج نصوص جماعي ZIP',Icons.archive_outlined),
+      ('chapterpdf','تقسيم فصول الكتاب PDF ZIP',Icons.auto_stories_outlined),
+      ('batchmerge','دمج جماعي لملفات PDF',Icons.library_add_outlined),
+      ('number','ترقيم صفحات PDF',Icons.format_list_numbered),
+      ('watermark','علامة مائية عربية وإنجليزية',Icons.branding_watermark),
     ];
     return Scaffold(
       appBar: AppBar(title: const Text('ExplApp PDF Studio'),centerTitle:true),
@@ -112,10 +153,20 @@ class _StudioHomeState extends State<StudioHome> {
           onChanged:(v)=>setState(() {mode=v!;files.clear();result=null;error=null;}),
         ))),
         const SizedBox(height:12),
-        FilledButton.icon(onPressed:busy?null:pick,icon:const Icon(Icons.folder_open),label:Text(mode=='imagespdf'?'اختيار الصور':mode=='merge'||mode=='compare'||mode=='batch'?'اختيار ملفات PDF':'اختيار ملف PDF')),
+        FilledButton.icon(onPressed:busy?null:pick,icon:const Icon(Icons.folder_open),label:Text(mode=='imagespdf'?'اختيار الصور':mode=='merge'||mode=='compare'||mode=='batch'||mode=='batchmerge'?'اختيار ملفات PDF':'اختيار ملف PDF')),
+        if (files.isNotEmpty && mode != 'imagespdf') OutlinedButton.icon(onPressed:busy?null:()=>preview(),icon:const Icon(Icons.preview),label:const Text('معاينة PDF')),
+        if (previewPath != null) Card(child:Column(children:[
+          SizedBox(height:380,child:InteractiveViewer(minScale:0.8,maxScale:5,child:Image.file(File(previewPath!),fit:BoxFit.contain))),
+          Row(mainAxisAlignment:MainAxisAlignment.center,children:[
+            IconButton(onPressed:busy||previewPage<=1?null:()=>preview(page:previewPage-1),icon:const Icon(Icons.chevron_right)),
+            Text('صفحة $previewPage من $previewTotal'),
+            IconButton(onPressed:busy||previewPage>=previewTotal?null:()=>preview(page:previewPage+1),icon:const Icon(Icons.chevron_left)),
+          ])
+        ])),
         ...files.map((f)=>ListTile(dense:true,leading:const Icon(Icons.picture_as_pdf),title:Text(f.split('/').last,maxLines:1,overflow:TextOverflow.ellipsis))),
         if (mode=='split' || mode=='delete' || mode=='reorder') TextField(controller:pages,decoration:InputDecoration(labelText:mode=='delete'?'الصفحات المراد حذفها':mode=='reorder'?'الترتيب الجديد لكل الصفحات':'الصفحات المراد استخراجها',helperText:mode=='reorder'?'مثال لملف من 4 صفحات: 3,1,4,2':'مثال: 1-3,5'),keyboardType:TextInputType.text),
         if (mode=='markdown' || mode=='html' || mode=='docx' || mode=='tables') const Padding(padding:EdgeInsets.symmetric(vertical:8),child:Text('تحويل النصوص القابلة للاستخراج فقط؛ لا يحافظ هذا الإصدار على التخطيط والصور والجداول الأصلية.')),
+        if (mode=='watermark') TextField(controller:query,decoration:const InputDecoration(labelText:'نص العلامة المائية (عربي أو إنجليزي)')),
         if (mode=='search') TextField(controller:query,decoration:const InputDecoration(labelText:'الكلمة أو العبارة المراد البحث عنها')),
         if (mode=='blank') const Padding(padding:EdgeInsets.symmetric(vertical:8),child:Text('سيُفحص محتوى الصفحات بصريًا بدقة منخفضة. تأكد من الملف الناتج قبل حذف الأصل.')),
         if (mode=='rotate') DropdownButtonFormField<String>(
@@ -131,6 +182,7 @@ class _StudioHomeState extends State<StudioHome> {
           Text(result!.split('/').last),
           Wrap(spacing:8,children:[
             TextButton.icon(onPressed:()=>OpenFilex.open(result!),icon:const Icon(Icons.open_in_new),label:const Text('فتح')),
+            TextButton.icon(onPressed:saveAs,icon:const Icon(Icons.save_alt),label:const Text('حفظ باسم')),
             TextButton.icon(onPressed:()=>Share.shareXFiles([XFile(result!)]),icon:const Icon(Icons.share),label:const Text('حفظ / مشاركة')),
           ])
         ]))),
