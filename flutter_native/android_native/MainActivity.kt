@@ -12,6 +12,10 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
 import java.nio.charset.StandardCharsets
+import java.io.FileOutputStream
+import java.util.zip.ZipOutputStream
+import java.util.zip.ZipEntry
+import android.graphics.Bitmap
 
 class MainActivity : FlutterActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -93,6 +97,19 @@ class MainActivity : FlutterActivity() {
                                     }
                                 }
                                 target.writeText(if (matches.isEmpty()) "لا توجد نتائج" else matches.joinToString("\\n\\n"), StandardCharsets.UTF_8)
+                            }
+                            "render" -> PDDocument.load(File(inputs[0])).use { source ->
+                                val renderer = PDFRenderer(source)
+                                ZipOutputStream(FileOutputStream(target)).use { zip ->
+                                    for (i in 0 until source.numberOfPages) {
+                                        val bitmap = renderer.renderImageWithDPI(i, 144f)
+                                        try {
+                                            zip.putNextEntry(ZipEntry("page-${i + 1}.png"))
+                                            bitmap.compress(Bitmap.CompressFormat.PNG, 100, zip)
+                                            zip.closeEntry()
+                                        } finally { bitmap.recycle() }
+                                    }
+                                }
                             }
                             "blank" -> PDDocument.load(File(inputs[0])).use { source ->
                                 // Rendered check detects image-only pages as nonblank; never trust missing text alone.
