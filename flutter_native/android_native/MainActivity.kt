@@ -254,7 +254,7 @@ class MainActivity : FlutterActivity() {
                             }
                             "chapterpdf" -> PDDocument.load(File(inputs[0])).use { source ->
                                 val extractor = PDFTextStripper()
-                                val heading = Regex("^(الفصل|الباب|الوحدة|القسم|الدرس|chapter|section|part|unit)(\\\\s|[:：]|$)", RegexOption.IGNORE_CASE)
+                                val heading = Regex("^(الفصل|الباب|الوحدة|القسم|الدرس|chapter|section|part|unit)(\\s|[:：]|$)", RegexOption.IGNORE_CASE)
                                 val starts = mutableListOf(0)
                                 for (i in 0 until source.numberOfPages) {
                                     extractor.startPage = i + 1
