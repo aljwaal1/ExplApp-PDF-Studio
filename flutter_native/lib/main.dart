@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:open_filex/open_filex.dart';
+import 'package:flutter/rendering.dart';
 
 void main() => runApp(const PdfStudioApp());
 const channel = MethodChannel('com.explapp.pdfstudio/native_pdf');
@@ -47,6 +48,18 @@ class _StudioHomeState extends State<StudioHome> {
     if (picked == null) return;
     final paths = picked.files.map((f) => f.path).whereType<String>().toList();
     setState(() {files..clear()..addAll(paths); result = null; error = null;});
+  }
+
+  Future<void> saveAs() async {
+    if (result == null) return;
+    try {
+      final saved = await channel.invokeMethod<String>('saveAs', {'source': result});
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(saved == null ? 'لم يتم الحفظ' : 'تم الحفظ في الموقع الذي اخترته')));
+    } on PlatformException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message ?? 'تعذر حفظ الملف')));
+    }
   }
 
   Future<void> execute() async {
@@ -136,6 +149,7 @@ class _StudioHomeState extends State<StudioHome> {
           Text(result!.split('/').last),
           Wrap(spacing:8,children:[
             TextButton.icon(onPressed:()=>OpenFilex.open(result!),icon:const Icon(Icons.open_in_new),label:const Text('فتح')),
+            TextButton.icon(onPressed:saveAs,icon:const Icon(Icons.save_alt),label:const Text('حفظ باسم')),
             TextButton.icon(onPressed:()=>Share.shareXFiles([XFile(result!)]),icon:const Icon(Icons.share),label:const Text('حفظ / مشاركة')),
           ])
         ]))),
