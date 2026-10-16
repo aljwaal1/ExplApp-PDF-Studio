@@ -90,7 +90,7 @@ class _StudioHomeState extends State<StudioHome> {
     setState(() {busy = true; result = null; error = null;});
     try {
       final folder = await getApplicationDocumentsDirectory();
-      final extension = <String,String>{'text':'txt','search':'txt','render':'zip','markdown':'md','html':'html','docx':'docx','compare':'txt','chapters':'csv','tables':'csv','batch':'zip','chapterpdf':'zip','batchmerge':'pdf'}[mode] ?? 'pdf';
+      final extension = <String,String>{'text':'txt','search':'txt','render':'zip','markdown':'md','html':'html','docx':'docx','compare':'txt','chapters':'csv','tables':'csv','batch':'zip','chapterpdf':'zip','batchmerge':'pdf','xlsx':'xlsx'}[mode] ?? 'pdf';
       final name = 'ExplApp-${mode}-${DateTime.now().millisecondsSinceEpoch}.$extension';
       final path = '${folder.path}/$name';
       await channel.invokeMethod<void>('process', {
@@ -127,6 +127,7 @@ class _StudioHomeState extends State<StudioHome> {
       ('compare','مقارنة نصية لملفين',Icons.compare_arrows),
       ('chapters','فهرسة عناوين الفصول CSV',Icons.menu_book_outlined),
       ('tables','استخراج صفوف CSV مبدئي',Icons.table_chart_outlined),
+      ('xlsx','استخراج صفوف إلى Excel XLSX',Icons.grid_on_outlined),
       ('batch','استخراج نصوص جماعي ZIP',Icons.archive_outlined),
       ('chapterpdf','تقسيم فصول الكتاب PDF ZIP',Icons.auto_stories_outlined),
       ('batchmerge','دمج جماعي لملفات PDF',Icons.library_add_outlined),
