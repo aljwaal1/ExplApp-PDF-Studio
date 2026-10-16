@@ -20,6 +20,8 @@ import android.graphics.BitmapFactory
 import com.tom_roush.pdfbox.pdmodel.PDPageContentStream
 import com.tom_roush.pdfbox.pdmodel.common.PDRectangle
 import com.tom_roush.pdfbox.pdmodel.graphics.image.LosslessFactory
+import com.tom_roush.pdfbox.pdmodel.font.PDType1Font
+import com.tom_roush.pdfbox.pdmodel.PDPageContentStream.AppendMode
 
 class MainActivity : FlutterActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -275,6 +277,31 @@ class MainActivity : FlutterActivity() {
                                         }
                                     }
                                 }
+                            }
+                            "number" -> PDDocument.load(File(inputs[0])).use { source ->
+                                source.pages.forEachIndexed { i, page ->
+                                    PDPageContentStream(source, page, AppendMode.APPEND, true, true).use { stream ->
+                                        stream.beginText()
+                                        stream.setFont(PDType1Font.HELVETICA, 12f)
+                                        stream.newLineAtOffset(page.mediaBox.width / 2f, 20f)
+                                        stream.showText((i + 1).toString())
+                                        stream.endText()
+                                    }
+                                }
+                                source.save(target)
+                            }
+                            "watermark" -> PDDocument.load(File(inputs[0])).use { source ->
+                                require(query.isNotBlank() && query.all { it.code in 32..126 }) { "الإصدار الحالي يدعم علامة مائية لاتينية فقط" }
+                                source.pages.forEach { page ->
+                                    PDPageContentStream(source, page, AppendMode.APPEND, true, true).use { stream ->
+                                        stream.beginText()
+                                        stream.setFont(PDType1Font.HELVETICA_BOLD, 20f)
+                                        stream.newLineAtOffset(30f, page.mediaBox.height / 2f)
+                                        stream.showText(query.take(55))
+                                        stream.endText()
+                                    }
+                                }
+                                source.save(target)
                             }
                             "rotate" -> PDDocument.load(File(inputs[0])).use { source ->
                                 require(degrees in listOf(90,180,270)) { "زاوية التدوير غير صحيحة" }
