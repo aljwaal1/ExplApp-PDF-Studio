@@ -9,6 +9,8 @@ void main() {
     expect(find.text('أدوات PDF أصلية'), findsOneWidget);
     expect(find.text('دمج ملفات PDF'), findsOneWidget);
     expect(find.text('حذف صفحات محددة'), findsOneWidget);
+    expect(find.text('بحث نصي داخل PDF'), findsOneWidget);
+    expect(find.text('حذف الصفحات البيضاء'), findsOneWidget);
     expect(find.byType(ListView), findsOneWidget);
   });
 }
