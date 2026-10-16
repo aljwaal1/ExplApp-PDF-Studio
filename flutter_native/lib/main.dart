@@ -33,6 +33,9 @@ class _StudioHomeState extends State<StudioHome> {
   bool busy = false;
   String? result;
   String? error;
+  String? previewPath;
+  int previewPage = 1;
+  int previewTotal = 0;
   final pages = TextEditingController(text: '1');
   final rotation = TextEditingController(text: '90');
   final query = TextEditingController();
@@ -47,7 +50,26 @@ class _StudioHomeState extends State<StudioHome> {
     );
     if (picked == null) return;
     final paths = picked.files.map((f) => f.path).whereType<String>().toList();
-    setState(() {files..clear()..addAll(paths); result = null; error = null;});
+    setState(() {files..clear()..addAll(paths); result = null; error = null; previewPath = null; previewPage = 1; previewTotal = 0;});
+  }
+
+  Future<void> preview({int page = 1}) async {
+    if (files.isEmpty || busy) return;
+    setState(() => busy = true);
+    try {
+      final response = await channel.invokeMapMethod<String, dynamic>('preview', {'source': files.first, 'page': page});
+      if (!mounted) return;
+      setState(() {
+        previewPath = response?['path'] as String?;
+        previewTotal = response?['total'] as int? ?? 0;
+        previewPage = page;
+        error = null;
+      });
+    } catch (e) {
+      if (mounted) setState(() => error = 'تعذر عرض معاينة PDF: $e');
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
   }
 
   Future<void> saveAs() async {
@@ -130,6 +152,15 @@ class _StudioHomeState extends State<StudioHome> {
         ))),
         const SizedBox(height:12),
         FilledButton.icon(onPressed:busy?null:pick,icon:const Icon(Icons.folder_open),label:Text(mode=='imagespdf'?'اختيار الصور':mode=='merge'||mode=='compare'||mode=='batch'||mode=='batchmerge'?'اختيار ملفات PDF':'اختيار ملف PDF')),
+        if (files.isNotEmpty && mode != 'imagespdf') OutlinedButton.icon(onPressed:busy?null:()=>preview(),icon:const Icon(Icons.preview),label:const Text('معاينة PDF')),
+        if (previewPath != null) Card(child:Column(children:[
+          SizedBox(height:380,child:InteractiveViewer(minScale:0.8,maxScale:5,child:Image.file(File(previewPath!),fit:BoxFit.contain))),
+          Row(mainAxisAlignment:MainAxisAlignment.center,children:[
+            IconButton(onPressed:busy||previewPage<=1?null:()=>preview(page:previewPage-1),icon:const Icon(Icons.chevron_right)),
+            Text('صفحة $previewPage من $previewTotal'),
+            IconButton(onPressed:busy||previewPage>=previewTotal?null:()=>preview(page:previewPage+1),icon:const Icon(Icons.chevron_left)),
+          ])
+        ])),
         ...files.map((f)=>ListTile(dense:true,leading:const Icon(Icons.picture_as_pdf),title:Text(f.split('/').last,maxLines:1,overflow:TextOverflow.ellipsis))),
         if (mode=='split' || mode=='delete' || mode=='reorder') TextField(controller:pages,decoration:InputDecoration(labelText:mode=='delete'?'الصفحات المراد حذفها':mode=='reorder'?'الترتيب الجديد لكل الصفحات':'الصفحات المراد استخراجها',helperText:mode=='reorder'?'مثال لملف من 4 صفحات: 3,1,4,2':'مثال: 1-3,5'),keyboardType:TextInputType.text),
         if (mode=='markdown' || mode=='html' || mode=='docx' || mode=='tables') const Padding(padding:EdgeInsets.symmetric(vertical:8),child:Text('تحويل النصوص القابلة للاستخراج فقط؛ لا يحافظ هذا الإصدار على التخطيط والصور والجداول الأصلية.')),
