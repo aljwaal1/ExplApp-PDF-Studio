@@ -34,7 +34,10 @@ jobs:
       - name: Configure PDFBox for Android
         run: |
           cp android_native/MainActivity.kt android/app/src/main/kotlin/com/explapp/explapp_pdf_studio/MainActivity.kt
-          printf '\n// Native offline PDF engine\ndependencies {\n    implementation("com.tom-roush:pdfbox-android:2.0.27.0")\n    implementation("cz.adaptech.tesseract4android:tesseract4android:4.9.0")\n}\n' >> android/app/build.gradle.kts
+          printf '\n// Native offline PDF engine\ndependencies {\n    implementation("com.tom-roush:pdfbox-android:2.0.27.0")\n    implementation("com.github.adaptech-cz.Tesseract4Android:tesseract4android:4.9.0")\n}\n' >> android/app/build.gradle.kts
+      - name: Configure JitPack OCR dependency
+        run: |
+          sed -i '/mavenCentral()/a\\        maven(url = "https://jitpack.io")' android/settings.gradle.kts
       - name: Bundle offline OCR language models
         run: |
           mkdir -p android/app/src/main/assets/tessdata
