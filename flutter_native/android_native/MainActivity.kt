@@ -56,6 +56,14 @@ class MainActivity : FlutterActivity() {
                                 }
                                 source.save(target)
                             }
+                            "reorder" -> PDDocument.load(File(inputs[0])).use { source ->
+                                val ordered = parsePages(pages, source.numberOfPages)
+                                require(ordered.size == source.numberOfPages && ordered.toSet().size == source.numberOfPages) { "يجب تحديد جميع الصفحات مرة واحدة دون تكرار" }
+                                PDDocument().use { output ->
+                                    ordered.forEach { i -> output.importPage(source.getPage(i)) }
+                                    output.save(target)
+                                }
+                            }
                             "reverse" -> PDDocument.load(File(inputs[0])).use { source ->
                                 PDDocument().use { output ->
                                     for (i in source.numberOfPages - 1 downTo 0) {
