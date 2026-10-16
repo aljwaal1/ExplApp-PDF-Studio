@@ -158,6 +158,46 @@ class MainActivity : FlutterActivity() {
                                 for (i in blank.asReversed()) source.removePage(i)
                                 source.save(target)
                             }
+                            "markdown" -> PDDocument.load(File(inputs[0])).use { source ->
+                                val stripper = PDFTextStripper()
+                                val pages = (1..source.numberOfPages).map { page ->
+                                    stripper.startPage = page
+                                    stripper.endPage = page
+                                    val text = stripper.getText(source).trim()
+                                    "## صفحة $page\\n\\n" + text
+                                }
+                                require(pages.any { it.substringAfter("\\n\\n").isNotBlank() }) { "الملف لا يحتوي على نص قابل للاستخراج؛ يلزم OCR" }
+                                target.writeText(pages.joinToString("\\n\\n"), StandardCharsets.UTF_8)
+                            }
+                            "html" -> PDDocument.load(File(inputs[0])).use { source ->
+                                val stripper = PDFTextStripper()
+                                val paragraphs = (1..source.numberOfPages).joinToString("\\n") { page ->
+                                    stripper.startPage = page
+                                    stripper.endPage = page
+                                    val text = stripper.getText(source).trim()
+                                    "<section><h2>صفحة $page</h2><p>" + htmlEscape(text).replace("\\n", "<br>") + "</p></section>"
+                                }
+                                require(paragraphs.contains(Regex("[\\p{L}]"))) { "الملف لا يحتوي على نص قابل للاستخراج" }
+                                target.writeText("<!doctype html><html lang=\\"ar\\"><head><meta charset=\\"utf-8\\"><title>PDF Export</title></head><body>" + paragraphs + "</body></html>", StandardCharsets.UTF_8)
+                            }
+                            "docx" -> PDDocument.load(File(inputs[0])).use { source ->
+                                val stripper = PDFTextStripper()
+                                val text = stripper.getText(source)
+                                require(text.isNotBlank()) { "الملف لا يحتوي على نص قابل للاستخراج؛ يلزم OCR" }
+                                val paras = text.lines().filter { it.isNotBlank() }.joinToString("") { line ->
+                                    "<w:p><w:r><w:t xml:space=\\"preserve\\">" + htmlEscape(line) + "</w:t></w:r></w:p>"
+                                }
+                                ZipOutputStream(FileOutputStream(target)).use { zip ->
+                                    fun entry(name: String, content: String) {
+                                        zip.putNextEntry(ZipEntry(name))
+                                        zip.write(content.toByteArray(StandardCharsets.UTF_8))
+                                        zip.closeEntry()
+                                    }
+                                    entry("[Content_Types].xml", "<?xml version=\\"1.0\\" encoding=\\"UTF-8\\"?><Types xmlns=\\"http://schemas.openxmlformats.org/package/2006/content-types\\"><Default Extension=\\"rels\\" ContentType=\\"application/vnd.openxmlformats-package.relationships+xml\\"/><Default Extension=\\"xml\\" ContentType=\\"application/xml\\"/><Override PartName=\\"/word/document.xml\\" ContentType=\\"application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml\\"/></Types>")
+                                    entry("_rels/.rels", "<?xml version=\\"1.0\\" encoding=\\"UTF-8\\"?><Relationships xmlns=\\"http://schemas.openxmlformats.org/package/2006/relationships\\"><Relationship Id=\\"rId1\\" Type=\\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\\" Target=\\"word/document.xml\\"/></Relationships>")
+                                    entry("word/document.xml", "<?xml version=\\"1.0\\" encoding=\\"UTF-8\\"?><w:document xmlns:w=\\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\\"><w:body>" + paras + "<w:sectPr/></w:body></w:document>")
+                                }
+                            }
                             "rotate" -> PDDocument.load(File(inputs[0])).use { source ->
                                 require(degrees in listOf(90,180,270)) { "زاوية التدوير غير صحيحة" }
                                 source.pages.forEach { page -> page.rotation = (page.rotation + degrees) % 360 }
@@ -172,6 +212,8 @@ class MainActivity : FlutterActivity() {
                 }.start()
             }
     }
+
+    private fun htmlEscape(value: String): String = value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\\"", "&quot;").replace("'", "&apos;")
 
     private fun parsePages(text: String, total: Int): List<Int> {
         val pages = linkedSetOf<Int>()
