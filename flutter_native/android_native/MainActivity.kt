@@ -200,6 +200,51 @@ class MainActivity : FlutterActivity() {
                                     entry("word/document.xml", "<?xml version=\"1.0\" encoding=\"UTF-8\"?><w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:body>" + paras + "<w:sectPr/></w:body></w:document>")
                                 }
                             }
+                            "compare" -> {
+                                require(inputs.size == 2) { "اختر ملفي PDF للمقارنة" }
+                                val texts = inputs.map { file -> PDDocument.load(File(file)).use { PDFTextStripper().getText(it) } }
+                                val a = texts[0].lines()
+                                val b = texts[1].lines()
+                                val differences = (0 until maxOf(a.size, b.size)).mapNotNull { i ->
+                                    val left = a.getOrNull(i).orEmpty()
+                                    val right = b.getOrNull(i).orEmpty()
+                                    if (left == right) null else "السطر ${i + 1}\nالأول: $left\nالثاني: $right"
+                                }
+                                target.writeText(if (differences.isEmpty()) "لا توجد اختلافات نصية" else differences.joinToString("\n\n"), StandardCharsets.UTF_8)
+                            }
+                            "chapters" -> PDDocument.load(File(inputs[0])).use { source ->
+                                val extractor = PDFTextStripper()
+                                val heading = Regex("^(?:الفصل|الباب|الوحدة|القسم|الدرس|chapter|section|part|unit)\\b", RegexOption.IGNORE_CASE)
+                                val rows = mutableListOf("page,title")
+                                for (i in 1..source.numberOfPages) {
+                                    extractor.startPage = i
+                                    extractor.endPage = i
+                                    extractor.getText(source).lines().map { it.trim() }.filter { it.length in 3..160 && heading.containsMatchIn(it) }.forEach { line ->
+                                        rows.add("$i," + csv(line))
+                                    }
+                                }
+                                target.writeText(rows.joinToString("\n"), StandardCharsets.UTF_8)
+                            }
+                            "tables" -> PDDocument.load(File(inputs[0])).use { source ->
+                                val text = PDFTextStripper().getText(source)
+                                val rows = text.lines().map { it.trim() }.filter { it.contains(Regex("\\s{2,}|\t")) }.map { line ->
+                                    line.split(Regex("\\s{2,}|\t")).joinToString(",") { csv(it) }
+                                }
+                                require(rows.isNotEmpty()) { "لا توجد صفوف قابلة للتقسيم؛ يلزم استخراج جداول متقدم أو OCR" }
+                                target.writeText(rows.joinToString("\n"), StandardCharsets.UTF_8)
+                            }
+                            "batch" -> {
+                                require(inputs.isNotEmpty()) { "اختر ملف PDF واحدًا على الأقل" }
+                                ZipOutputStream(FileOutputStream(target)).use { zip ->
+                                    inputs.forEachIndexed { index, path ->
+                                        val text = PDDocument.load(File(path)).use { PDFTextStripper().getText(it) }
+                                        val entry = ZipEntry("document-${index + 1}.txt")
+                                        zip.putNextEntry(entry)
+                                        zip.write(text.toByteArray(StandardCharsets.UTF_8))
+                                        zip.closeEntry()
+                                    }
+                                }
+                            }
                             "rotate" -> PDDocument.load(File(inputs[0])).use { source ->
                                 require(degrees in listOf(90,180,270)) { "زاوية التدوير غير صحيحة" }
                                 source.pages.forEach { page -> page.rotation = (page.rotation + degrees) % 360 }
@@ -214,6 +259,8 @@ class MainActivity : FlutterActivity() {
                 }.start()
             }
     }
+
+    private fun csv(s: String): String = "\"" + s.replace("\"", "\"\"") + "\""
 
     private fun htmlEscape(value: String): String = value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;").replace("'", "&apos;")
 

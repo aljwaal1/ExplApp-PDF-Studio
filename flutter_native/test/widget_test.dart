@@ -17,6 +17,10 @@ void main() {
       await tester.scrollUntilVisible(find.text(label), 200, scrollable: find.byType(Scrollable).first);
       expect(find.text(label), findsOneWidget);
     }
+    for (final label in ['مقارنة نصية لملفين', 'فهرسة عناوين الفصول CSV', 'استخراج صفوف CSV مبدئي', 'استخراج نصوص جماعي ZIP']) {
+      await tester.scrollUntilVisible(find.text(label), 200, scrollable: find.byType(Scrollable).first);
+      expect(find.text(label), findsOneWidget);
+    }
     expect(find.byType(ListView), findsOneWidget);
   });
 }

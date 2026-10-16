@@ -42,7 +42,7 @@ class _StudioHomeState extends State<StudioHome> {
   Future<void> pick() async {
     final picked = await FilePicker.platform.pickFiles(
       type: FileType.custom, allowedExtensions: mode == 'imagespdf' ? ['png','jpg','jpeg'] : ['pdf'],
-      allowMultiple: mode == 'merge' || mode == 'imagespdf', withData: false,
+      allowMultiple: mode == 'merge' || mode == 'imagespdf' || mode == 'compare' || mode == 'batch', withData: false,
     );
     if (picked == null) return;
     final paths = picked.files.map((f) => f.path).whereType<String>().toList();
@@ -51,11 +51,11 @@ class _StudioHomeState extends State<StudioHome> {
 
   Future<void> execute() async {
     if (files.isEmpty) {setState(()=>error='اختر ملف PDF أولًا');return;}
-    if (mode == 'merge' && files.length < 2) {setState(()=>error='اختر ملفين على الأقل للدمج');return;}
+    if ((mode == 'merge' || mode == 'compare') && files.length < 2) {setState(()=>error='اختر ملفين على الأقل للدمج');return;}
     setState(() {busy = true; result = null; error = null;});
     try {
       final folder = await getApplicationDocumentsDirectory();
-      final extension = <String,String>{'text':'txt','search':'txt','render':'zip','markdown':'md','html':'html','docx':'docx'}[mode] ?? 'pdf';
+      final extension = <String,String>{'text':'txt','search':'txt','render':'zip','markdown':'md','html':'html','docx':'docx','compare':'txt','chapters':'csv','tables':'csv','batch':'zip'}[mode] ?? 'pdf';
       final name = 'ExplApp-${mode}-${DateTime.now().millisecondsSinceEpoch}.$extension';
       final path = '${folder.path}/$name';
       await channel.invokeMethod<void>('process', {
@@ -89,6 +89,10 @@ class _StudioHomeState extends State<StudioHome> {
       ('markdown','PDF إلى Markdown',Icons.description_outlined),
       ('html','PDF إلى HTML',Icons.code),
       ('docx','PDF إلى Word DOCX',Icons.article_outlined),
+      ('compare','مقارنة نصية لملفين',Icons.compare_arrows),
+      ('chapters','فهرسة عناوين الفصول CSV',Icons.menu_book_outlined),
+      ('tables','استخراج صفوف CSV مبدئي',Icons.table_chart_outlined),
+      ('batch','استخراج نصوص جماعي ZIP',Icons.archive_outlined),
     ];
     return Scaffold(
       appBar: AppBar(title: const Text('ExplApp PDF Studio'),centerTitle:true),
@@ -108,10 +112,10 @@ class _StudioHomeState extends State<StudioHome> {
           onChanged:(v)=>setState(() {mode=v!;files.clear();result=null;error=null;}),
         ))),
         const SizedBox(height:12),
-        FilledButton.icon(onPressed:busy?null:pick,icon:const Icon(Icons.folder_open),label:Text(mode=='imagespdf'?'اختيار الصور':mode=='merge'?'اختيار ملفات PDF':'اختيار ملف PDF')),
+        FilledButton.icon(onPressed:busy?null:pick,icon:const Icon(Icons.folder_open),label:Text(mode=='imagespdf'?'اختيار الصور':mode=='merge'||mode=='compare'||mode=='batch'?'اختيار ملفات PDF':'اختيار ملف PDF')),
         ...files.map((f)=>ListTile(dense:true,leading:const Icon(Icons.picture_as_pdf),title:Text(f.split('/').last,maxLines:1,overflow:TextOverflow.ellipsis))),
         if (mode=='split' || mode=='delete' || mode=='reorder') TextField(controller:pages,decoration:InputDecoration(labelText:mode=='delete'?'الصفحات المراد حذفها':mode=='reorder'?'الترتيب الجديد لكل الصفحات':'الصفحات المراد استخراجها',helperText:mode=='reorder'?'مثال لملف من 4 صفحات: 3,1,4,2':'مثال: 1-3,5'),keyboardType:TextInputType.text),
-        if (mode=='markdown' || mode=='html' || mode=='docx') const Padding(padding:EdgeInsets.symmetric(vertical:8),child:Text('تحويل النصوص القابلة للاستخراج فقط؛ لا يحافظ هذا الإصدار على التخطيط والصور والجداول الأصلية.')),
+        if (mode=='markdown' || mode=='html' || mode=='docx' || mode=='tables') const Padding(padding:EdgeInsets.symmetric(vertical:8),child:Text('تحويل النصوص القابلة للاستخراج فقط؛ لا يحافظ هذا الإصدار على التخطيط والصور والجداول الأصلية.')),
         if (mode=='search') TextField(controller:query,decoration:const InputDecoration(labelText:'الكلمة أو العبارة المراد البحث عنها')),
         if (mode=='blank') const Padding(padding:EdgeInsets.symmetric(vertical:8),child:Text('سيُفحص محتوى الصفحات بصريًا بدقة منخفضة. تأكد من الملف الناتج قبل حذف الأصل.')),
         if (mode=='rotate') DropdownButtonFormField<String>(
