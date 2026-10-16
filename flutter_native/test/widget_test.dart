@@ -21,6 +21,10 @@ void main() {
       await tester.scrollUntilVisible(find.text(label), 200, scrollable: find.byType(Scrollable).first);
       expect(find.text(label), findsOneWidget);
     }
+    for (final label in ['تقسيم فصول الكتاب PDF ZIP', 'دمج جماعي لملفات PDF']) {
+      await tester.scrollUntilVisible(find.text(label), 200, scrollable: find.byType(Scrollable).first);
+      expect(find.text(label), findsOneWidget);
+    }
     expect(find.byType(ListView), findsOneWidget);
   });
 }
