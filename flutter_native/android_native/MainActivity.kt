@@ -66,6 +66,28 @@ class MainActivity : FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.explapp.pdfstudio/native_pdf")
             .setMethodCallHandler { call, result ->
+                if (call.method == "preview") {
+                    val source = File(call.argument<String>("source") ?: "")
+                    val page = call.argument<Int>("page") ?: 1
+                    Thread {
+                        try {
+                            require(source.isFile) { "ملف المعاينة غير موجود" }
+                            PDDocument.load(source).use { pdf ->
+                                require(page in 1..pdf.numberOfPages) { "صفحة غير موجودة" }
+                                val bitmap = PDFRenderer(pdf).renderImageWithDPI(page - 1, 105f)
+                                val preview = File(cacheDir, "preview-${System.nanoTime()}.png")
+                                try {
+                                    FileOutputStream(preview).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                                } finally { bitmap.recycle() }
+                                val value = mapOf("path" to preview.absolutePath, "total" to pdf.numberOfPages)
+                                runOnUiThread { result.success(value) }
+                            }
+                        } catch (e: Exception) {
+                            runOnUiThread { result.error("PREVIEW_ERROR", e.message, null) }
+                        }
+                    }.start()
+                    return@setMethodCallHandler
+                }
                 if (call.method == "saveAs") {
                     if (pendingSave != null) { result.error("BUSY", "يوجد طلب حفظ مفتوح", null); return@setMethodCallHandler }
                     val source = File(call.argument<String>("source") ?: "")
