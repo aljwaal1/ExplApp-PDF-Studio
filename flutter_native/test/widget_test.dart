@@ -25,6 +25,10 @@ void main() {
       await tester.scrollUntilVisible(find.text(label), 200, scrollable: find.byType(Scrollable).first);
       expect(find.text(label), findsOneWidget);
     }
+    for (final label in ['ترقيم صفحات PDF', 'علامة مائية نصية إنجليزية']) {
+      await tester.scrollUntilVisible(find.text(label), 200, scrollable: find.byType(Scrollable).first);
+      expect(find.text(label), findsOneWidget);
+    }
     expect(find.byType(ListView), findsOneWidget);
   });
 }
