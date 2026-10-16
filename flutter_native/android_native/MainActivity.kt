@@ -11,6 +11,7 @@ import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.pdmodel.PDPage
 import com.tom_roush.pdfbox.text.PDFTextStripper
 import com.tom_roush.pdfbox.rendering.PDFRenderer
+import com.googlecode.tesseract.android.TessBaseAPI
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -315,6 +316,34 @@ class MainActivity : FlutterActivity() {
                                 }
                                 require(rows.isNotEmpty()) { "لا توجد صفوف قابلة للتقسيم؛ يلزم استخراج جداول متقدم أو OCR" }
                                 target.writeText(rows.joinToString("\n"), StandardCharsets.UTF_8)
+                            }
+                            "ocr" -> PDDocument.load(File(inputs[0])).use { source ->
+                                val tessRoot = File(filesDir, "ocr-models")
+                                val tessData = File(tessRoot, "tessdata")
+                                tessData.mkdirs()
+                                listOf("ara", "eng").forEach { language ->
+                                    val model = File(tessData, "$language.traineddata")
+                                    if (!model.isFile) {
+                                        assets.open("tessdata/$language.traineddata").use { input ->
+                                            model.outputStream().use { output -> input.copyTo(output) }
+                                        }
+                                    }
+                                }
+                                val tess = TessBaseAPI()
+                                require(tess.init(tessRoot.absolutePath, "ara+eng")) { "تعذر بدء محرك OCR" }
+                                try {
+                                    val renderer = PDFRenderer(source)
+                                    val pageTexts = mutableListOf<String>()
+                                    for (i in 0 until source.numberOfPages) {
+                                        val bitmap = renderer.renderImageWithDPI(i, 180f)
+                                        try {
+                                            tess.setImage(bitmap)
+                                            pageTexts.add("===== صفحة ${i + 1} =====\n" + (tess.utF8Text ?: ""))
+                                            tess.clear()
+                                        } finally { bitmap.recycle() }
+                                    }
+                                    target.writeText(pageTexts.joinToString("\n\n"), StandardCharsets.UTF_8)
+                                } finally { tess.recycle() }
                             }
                             "xlsx" -> PDDocument.load(File(inputs[0])).use { source ->
                                 val text = PDFTextStripper().getText(source)
