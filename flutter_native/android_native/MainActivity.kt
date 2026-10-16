@@ -171,13 +171,15 @@ class MainActivity : FlutterActivity() {
                             }
                             "html" -> PDDocument.load(File(inputs[0])).use { source ->
                                 val stripper = PDFTextStripper()
+                                var hasExtractableText = false
                                 val paragraphs = (1..source.numberOfPages).joinToString("\n") { page ->
                                     stripper.startPage = page
                                     stripper.endPage = page
                                     val text = stripper.getText(source).trim()
+                                    if (text.isNotBlank()) hasExtractableText = true
                                     "<section><h2>صفحة $page</h2><p>" + htmlEscape(text).replace("\n", "<br>") + "</p></section>"
                                 }
-                                require(paragraphs.replace(Regex("<[^>]*>"), "").isNotBlank()) { "الملف لا يحتوي على نص قابل للاستخراج" }
+                                require(hasExtractableText) { "الملف لا يحتوي على نص قابل للاستخراج" }
                                 target.writeText("<!doctype html><html lang=\"ar\"><head><meta charset=\"utf-8\"><title>PDF Export</title></head><body>" + paragraphs + "</body></html>", StandardCharsets.UTF_8)
                             }
                             "docx" -> PDDocument.load(File(inputs[0])).use { source ->
