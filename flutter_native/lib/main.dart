@@ -54,7 +54,8 @@ class _StudioHomeState extends State<StudioHome> {
     setState(() {busy = true; result = null; error = null;});
     try {
       final folder = await getApplicationDocumentsDirectory();
-      final name = 'ExplApp-${mode}-${DateTime.now().millisecondsSinceEpoch}.pdf';
+      final extension = mode == 'text' ? 'txt' : 'pdf';
+      final name = 'ExplApp-${mode}-${DateTime.now().millisecondsSinceEpoch}.$extension';
       final path = '${folder.path}/$name';
       await channel.invokeMethod<void>('process', {
         'operation': mode, 'inputs': files, 'output': path,
@@ -75,6 +76,9 @@ class _StudioHomeState extends State<StudioHome> {
       ('merge','دمج ملفات PDF',Icons.layers),
       ('split','استخراج صفحات',Icons.content_cut),
       ('rotate','تدوير الصفحات',Icons.rotate_right),
+      ('delete','حذف صفحات محددة',Icons.delete_outline),
+      ('reverse','عكس ترتيب الصفحات',Icons.swap_vert),
+      ('text','استخراج النص إلى TXT',Icons.text_snippet_outlined),
     ];
     return Scaffold(
       appBar: AppBar(title: const Text('ExplApp PDF Studio'),centerTitle:true),
@@ -96,7 +100,7 @@ class _StudioHomeState extends State<StudioHome> {
         const SizedBox(height:12),
         FilledButton.icon(onPressed:busy?null:pick,icon:const Icon(Icons.folder_open),label:Text(mode=='merge'?'اختيار ملفات PDF':'اختيار ملف PDF')),
         ...files.map((f)=>ListTile(dense:true,leading:const Icon(Icons.picture_as_pdf),title:Text(f.split('/').last,maxLines:1,overflow:TextOverflow.ellipsis))),
-        if (mode=='split') TextField(controller:pages,decoration:const InputDecoration(labelText:'الصفحات (مثال: 1-3,5)',helperText:'يمكن تحديد صفحات متعددة'),keyboardType:TextInputType.text),
+        if (mode=='split' || mode=='delete') TextField(controller:pages,decoration:InputDecoration(labelText:mode=='delete'?'الصفحات المراد حذفها':'الصفحات المراد استخراجها',helperText:'مثال: 1-3,5'),keyboardType:TextInputType.text),
         if (mode=='rotate') DropdownButtonFormField<String>(
           value: rotation.text,items:['90','180','270'].map((d)=>DropdownMenuItem(value:d,child:Text('$d درجة'))).toList(),
           onChanged:(v)=>setState(()=>rotation.text=v??'90'),decoration:const InputDecoration(labelText:'زاوية التدوير'),
