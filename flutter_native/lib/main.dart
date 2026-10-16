@@ -78,6 +78,7 @@ class _StudioHomeState extends State<StudioHome> {
       ('rotate','تدوير الصفحات',Icons.rotate_right),
       ('delete','حذف صفحات محددة',Icons.delete_outline),
       ('reverse','عكس ترتيب الصفحات',Icons.swap_vert),
+      ('reorder','إعادة ترتيب الصفحات',Icons.reorder),
       ('text','استخراج النص إلى TXT',Icons.text_snippet_outlined),
     ];
     return Scaffold(
@@ -100,7 +101,7 @@ class _StudioHomeState extends State<StudioHome> {
         const SizedBox(height:12),
         FilledButton.icon(onPressed:busy?null:pick,icon:const Icon(Icons.folder_open),label:Text(mode=='merge'?'اختيار ملفات PDF':'اختيار ملف PDF')),
         ...files.map((f)=>ListTile(dense:true,leading:const Icon(Icons.picture_as_pdf),title:Text(f.split('/').last,maxLines:1,overflow:TextOverflow.ellipsis))),
-        if (mode=='split' || mode=='delete') TextField(controller:pages,decoration:InputDecoration(labelText:mode=='delete'?'الصفحات المراد حذفها':'الصفحات المراد استخراجها',helperText:'مثال: 1-3,5'),keyboardType:TextInputType.text),
+        if (mode=='split' || mode=='delete' || mode=='reorder') TextField(controller:pages,decoration:InputDecoration(labelText:mode=='delete'?'الصفحات المراد حذفها':mode=='reorder'?'الترتيب الجديد لكل الصفحات':'الصفحات المراد استخراجها',helperText:mode=='reorder'?'مثال لملف من 4 صفحات: 3,1,4,2':'مثال: 1-3,5'),keyboardType:TextInputType.text),
         if (mode=='rotate') DropdownButtonFormField<String>(
           value: rotation.text,items:['90','180','270'].map((d)=>DropdownMenuItem(value:d,child:Text('$d درجة'))).toList(),
           onChanged:(v)=>setState(()=>rotation.text=v??'90'),decoration:const InputDecoration(labelText:'زاوية التدوير'),
