@@ -313,6 +313,39 @@ class MainActivity : FlutterActivity() {
                                 require(rows.isNotEmpty()) { "لا توجد صفوف قابلة للتقسيم؛ يلزم استخراج جداول متقدم أو OCR" }
                                 target.writeText(rows.joinToString("\n"), StandardCharsets.UTF_8)
                             }
+                            "xlsx" -> PDDocument.load(File(inputs[0])).use { source ->
+                                val text = PDFTextStripper().getText(source)
+                                val parsed = text.lines().map { it.trim() }
+                                    .filter { it.contains(Regex("\\s{2,}|\\t")) }
+                                    .map { it.split(Regex("\\s{2,}|\\t")) }
+                                require(parsed.isNotEmpty()) { "لم يتم اكتشاف صفوف قابلة للتقسيم؛ هذا المحول تجريبي" }
+                                val xml = buildString {
+                                    append("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>")
+                                    append("<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData>")
+                                    parsed.forEachIndexed { index, cells ->
+                                        append("<row r=\"${index + 1}\">")
+                                        cells.forEach { cell ->
+                                            append("<c t=\"inlineStr\"><is><t>")
+                                            append(htmlEscape(cell))
+                                            append("</t></is></c>")
+                                        }
+                                        append("</row>")
+                                    }
+                                    append("</sheetData></worksheet>")
+                                }
+                                ZipOutputStream(FileOutputStream(target)).use { zip ->
+                                    fun entry(name: String, content: String) {
+                                        zip.putNextEntry(ZipEntry(name))
+                                        zip.write(content.toByteArray(StandardCharsets.UTF_8))
+                                        zip.closeEntry()
+                                    }
+                                    entry("[Content_Types].xml", "<?xml version=\"1.0\"?><Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\"><Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/><Default Extension=\"xml\" ContentType=\"application/xml\"/><Override PartName=\"/xl/workbook.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml\"/><Override PartName=\"/xl/worksheets/sheet1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml\"/></Types>")
+                                    entry("_rels/.rels", "<?xml version=\"1.0\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"xl/workbook.xml\"/></Relationships>")
+                                    entry("xl/workbook.xml", "<?xml version=\"1.0\"?><workbook xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\"><sheets><sheet name=\"Export\" sheetId=\"1\" r:id=\"rId1\"/></sheets></workbook>")
+                                    entry("xl/_rels/workbook.xml.rels", "<?xml version=\"1.0\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"worksheets/sheet1.xml\"/></Relationships>")
+                                    entry("xl/worksheets/sheet1.xml", xml)
+                                }
+                            }
                             "batch" -> {
                                 require(inputs.isNotEmpty()) { "اختر ملف PDF واحدًا على الأقل" }
                                 ZipOutputStream(FileOutputStream(target)).use { zip ->
