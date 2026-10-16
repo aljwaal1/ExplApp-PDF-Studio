@@ -16,6 +16,10 @@ import java.io.FileOutputStream
 import java.util.zip.ZipOutputStream
 import java.util.zip.ZipEntry
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import com.tom_roush.pdfbox.pdmodel.PDPageContentStream
+import com.tom_roush.pdfbox.pdmodel.common.PDRectangle
+import com.tom_roush.pdfbox.pdmodel.graphics.image.LosslessFactory
 
 class MainActivity : FlutterActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -97,6 +101,24 @@ class MainActivity : FlutterActivity() {
                                     }
                                 }
                                 target.writeText(if (matches.isEmpty()) "لا توجد نتائج" else matches.joinToString("\\n\\n"), StandardCharsets.UTF_8)
+                            }
+                            "imagespdf" -> PDDocument().use { output ->
+                                for (file in inputs) {
+                                    val bitmap = BitmapFactory.decodeFile(file) ?: error("تعذر قراءة الصورة")
+                                    try {
+                                        // Fit each image on an A4 page, preserving aspect ratio.
+                                        val page = PDPage(PDRectangle.A4)
+                                        output.addPage(page)
+                                        val img = LosslessFactory.createFromImage(output, bitmap)
+                                        val scale = minOf((page.mediaBox.width - 40f) / bitmap.width, (page.mediaBox.height - 40f) / bitmap.height)
+                                        val w = bitmap.width * scale
+                                        val h = bitmap.height * scale
+                                        PDPageContentStream(output, page).use { stream ->
+                                            stream.drawImage(img, (page.mediaBox.width - w) / 2f, (page.mediaBox.height - h) / 2f, w, h)
+                                        }
+                                    } finally { bitmap.recycle() }
+                                }
+                                output.save(target)
                             }
                             "render" -> PDDocument.load(File(inputs[0])).use { source ->
                                 val renderer = PDFRenderer(source)
