@@ -55,7 +55,7 @@ class _StudioHomeState extends State<StudioHome> {
     setState(() {busy = true; result = null; error = null;});
     try {
       final folder = await getApplicationDocumentsDirectory();
-      final extension = (mode == 'text' || mode == 'search') ? 'txt' : 'pdf';
+      final extension = (mode == 'text' || mode == 'search') ? 'txt' : mode == 'render' ? 'zip' : 'pdf';
       final name = 'ExplApp-${mode}-${DateTime.now().millisecondsSinceEpoch}.$extension';
       final path = '${folder.path}/$name';
       await channel.invokeMethod<void>('process', {
@@ -84,6 +84,7 @@ class _StudioHomeState extends State<StudioHome> {
       ('text','استخراج النص إلى TXT',Icons.text_snippet_outlined),
       ('search','بحث نصي داخل PDF',Icons.search),
       ('blank','حذف الصفحات البيضاء',Icons.layers_clear),
+      ('render','PDF إلى صور PNG',Icons.image_outlined),
     ];
     return Scaffold(
       appBar: AppBar(title: const Text('ExplApp PDF Studio'),centerTitle:true),
