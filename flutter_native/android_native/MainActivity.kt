@@ -245,6 +245,37 @@ class MainActivity : FlutterActivity() {
                                     }
                                 }
                             }
+                            "batchmerge" -> {
+                                require(inputs.size >= 2) { "اختر ملفين على الأقل" }
+                                val merger = PDFMergerUtility()
+                                inputs.forEach { merger.addSource(File(it)) }
+                                merger.destinationFileName = dest
+                                merger.mergeDocuments(null)
+                            }
+                            "chapterpdf" -> PDDocument.load(File(inputs[0])).use { source ->
+                                val extractor = PDFTextStripper()
+                                val heading = Regex("^(الفصل|الباب|الوحدة|القسم|الدرس|chapter|section|part|unit)(\\\\s|[:：]|$)", RegexOption.IGNORE_CASE)
+                                val starts = mutableListOf(0)
+                                for (i in 0 until source.numberOfPages) {
+                                    extractor.startPage = i + 1
+                                    extractor.endPage = i + 1
+                                    val lines = extractor.getText(source).lines().take(20).map { it.trim() }
+                                    if (i > 0 && lines.any { it.length in 3..120 && heading.containsMatchIn(it) }) starts.add(i)
+                                }
+                                val boundaries = starts.distinct().sorted() + source.numberOfPages
+                                ZipOutputStream(FileOutputStream(target)).use { zip ->
+                                    for (part in 0 until boundaries.size - 1) {
+                                        PDDocument().use { section ->
+                                            for (i in boundaries[part] until boundaries[part + 1]) section.importPage(source.getPage(i))
+                                            val buffer = java.io.ByteArrayOutputStream()
+                                            section.save(buffer)
+                                            zip.putNextEntry(ZipEntry("chapter-${part + 1}.pdf"))
+                                            zip.write(buffer.toByteArray())
+                                            zip.closeEntry()
+                                        }
+                                    }
+                                }
+                            }
                             "rotate" -> PDDocument.load(File(inputs[0])).use { source ->
                                 require(degrees in listOf(90,180,270)) { "زاوية التدوير غير صحيحة" }
                                 source.pages.forEach { page -> page.rotation = (page.rotation + degrees) % 360 }
