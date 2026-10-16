@@ -338,7 +338,7 @@ class MainActivity : FlutterActivity() {
                                         val bitmap = renderer.renderImageWithDPI(i, 180f)
                                         try {
                                             tess.setImage(bitmap)
-                                            pageTexts.add("===== صفحة ${i + 1} =====\n" + (tess.utF8Text ?: ""))
+                                            pageTexts.add("===== صفحة ${i + 1} =====\n" + (tess.getUTF8Text() ?: ""))
                                             tess.clear()
                                         } finally { bitmap.recycle() }
                                     }
