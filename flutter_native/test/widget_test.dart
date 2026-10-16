@@ -25,10 +25,12 @@ void main() {
       await tester.scrollUntilVisible(find.text(label), 200, scrollable: find.byType(Scrollable).first);
       expect(find.text(label), findsOneWidget);
     }
-    for (final label in ['ترقيم صفحات PDF', 'علامة مائية نصية إنجليزية']) {
+    for (final label in ['ترقيم صفحات PDF', 'علامة مائية عربية وإنجليزية']) {
       await tester.scrollUntilVisible(find.text(label), 200, scrollable: find.byType(Scrollable).first);
       expect(find.text(label), findsOneWidget);
     }
+    await tester.scrollUntilVisible(find.text('استخراج صفوف إلى Excel XLSX'), 200, scrollable: find.byType(Scrollable).first);
+    expect(find.text('استخراج صفوف إلى Excel XLSX'), findsOneWidget);
     expect(find.byType(ListView), findsOneWidget);
   });
 }
