@@ -42,7 +42,14 @@ jobs:
       - name: Run Flutter widget tests
         run: flutter test
       - name: Build Android APK
-        run: flutter build apk --debug
+        run: |
+          for attempt in 1 2; do
+            if flutter build apk --debug; then exit 0; fi
+            if [ "$attempt" -eq 2 ]; then exit 1; fi
+            echo "Retrying after a transient Android SDK/NDK download failure..."
+            rm -rf "$ANDROID_HOME/ndk/28.2.13676358" "$ANDROID_SDK_ROOT/ndk/28.2.13676358"
+            sleep 8
+          done
       - uses: actions/upload-artifact@v4
         with:
           name: ExplApp-Flutter-Native-APK
