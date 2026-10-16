@@ -13,6 +13,10 @@ void main() {
     expect(find.text('بحث نصي داخل PDF'), findsOneWidget);
     await tester.scrollUntilVisible(find.text('حذف الصفحات البيضاء'), 200, scrollable: find.byType(Scrollable).first);
     expect(find.text('حذف الصفحات البيضاء'), findsOneWidget);
+    for (final label in ['PDF إلى Markdown', 'PDF إلى HTML', 'PDF إلى Word DOCX']) {
+      await tester.scrollUntilVisible(find.text(label), 200, scrollable: find.byType(Scrollable).first);
+      expect(find.text(label), findsOneWidget);
+    }
     expect(find.byType(ListView), findsOneWidget);
   });
 }
