@@ -1,6 +1,10 @@
 package com.explapp.explapp_pdf_studio
 
 import android.os.Bundle
+import android.app.Activity
+import android.content.Intent
+import android.net.Uri
+import java.io.FileInputStream
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import com.tom_roush.pdfbox.multipdf.PDFMergerUtility
 import com.tom_roush.pdfbox.pdmodel.PDDocument
@@ -24,6 +28,35 @@ import com.tom_roush.pdfbox.pdmodel.font.PDType1Font
 import com.tom_roush.pdfbox.pdmodel.PDPageContentStream.AppendMode
 
 class MainActivity : FlutterActivity() {
+    private var pendingSave: io.flutter.plugin.common.MethodChannel.Result? = null
+    private var pendingSource: File? = null
+    private val saveRequestCode = 64081
+
+    @Deprecated("Android activity callback")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != saveRequestCode) return
+        val callback = pendingSave ?: return
+        val source = pendingSource
+        pendingSave = null
+        pendingSource = null
+        val uri = data?.data
+        if (resultCode != Activity.RESULT_OK || uri == null || source == null) {
+            callback.success(null)
+            return
+        }
+        Thread {
+            try {
+                contentResolver.openOutputStream(uri)?.use { output ->
+                    FileInputStream(source).use { it.copyTo(output) }
+                } ?: error("تعذر فتح مسار الحفظ")
+                runOnUiThread { callback.success(uri.toString()) }
+            } catch (e: Exception) {
+                runOnUiThread { callback.error("SAVE_ERROR", e.message ?: "خطأ أثناء الحفظ", null) }
+            }
+        }.start()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         PDFBoxResourceLoader.init(applicationContext)
@@ -33,6 +66,29 @@ class MainActivity : FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.explapp.pdfstudio/native_pdf")
             .setMethodCallHandler { call, result ->
+                if (call.method == "saveAs") {
+                    if (pendingSave != null) { result.error("BUSY", "يوجد طلب حفظ مفتوح", null); return@setMethodCallHandler }
+                    val source = File(call.argument<String>("source") ?: "")
+                    if (!source.isFile) { result.error("INVALID_SOURCE", "ملف النتيجة غير موجود", null); return@setMethodCallHandler }
+                    val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                        addCategory(Intent.CATEGORY_OPENABLE)
+                        type = when(source.extension.lowercase()) {
+                            "pdf" -> "application/pdf"
+                            "txt" -> "text/plain"
+                            "csv" -> "text/csv"
+                            "html" -> "text/html"
+                            "docx" -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                            "zip" -> "application/zip"
+                            else -> "application/octet-stream"
+                        }
+                        putExtra(Intent.EXTRA_TITLE, source.name)
+                    }
+                    pendingSave = result
+                    pendingSource = source
+                    try { startActivityForResult(intent, saveRequestCode) }
+                    catch(e: Exception) { pendingSave = null; pendingSource = null; result.error("SAVE_ERROR", e.message, null) }
+                    return@setMethodCallHandler
+                }
                 if (call.method != "process") { result.notImplemented(); return@setMethodCallHandler }
                 val op = call.argument<String>("operation") ?: ""
                 val inputs = call.argument<List<String>>("inputs") ?: emptyList()
