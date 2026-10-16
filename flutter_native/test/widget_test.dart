@@ -8,6 +8,7 @@ void main() {
     expect(find.text('ExplApp PDF Studio'), findsOneWidget);
     expect(find.text('أدوات PDF أصلية'), findsOneWidget);
     expect(find.text('دمج ملفات PDF'), findsOneWidget);
-    expect(find.byType(FilledButton), findsWidgets);
+    expect(find.text('حذف صفحات محددة'), findsOneWidget);
+    expect(find.byType(ListView), findsOneWidget);
   });
 }

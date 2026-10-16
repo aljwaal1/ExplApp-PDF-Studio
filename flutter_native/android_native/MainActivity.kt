@@ -5,11 +5,12 @@ import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import com.tom_roush.pdfbox.multipdf.PDFMergerUtility
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.pdmodel.PDPage
-import com.tom_roush.pdfbox.pdmodel.PDPageTree
+import com.tom_roush.pdfbox.text.PDFTextStripper
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
+import java.nio.charset.StandardCharsets
 
 class MainActivity : FlutterActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -46,6 +47,36 @@ class MainActivity : FlutterActivity() {
                                     selected.forEach { i -> output.importPage(source.getPage(i)) }
                                     output.save(target)
                                 }
+                            }
+                            "delete" -> PDDocument.load(File(inputs[0])).use { source ->
+                                val removed = parsePages(pages, source.numberOfPages).toSet()
+                                require(removed.size < source.numberOfPages) { "لا يمكن حذف جميع الصفحات" }
+                                for (i in source.numberOfPages - 1 downTo 0) {
+                                    if (removed.contains(i)) source.removePage(i)
+                                }
+                                source.save(target)
+                            }
+                            "reorder" -> PDDocument.load(File(inputs[0])).use { source ->
+                                val ordered = parsePages(pages, source.numberOfPages)
+                                require(ordered.size == source.numberOfPages && ordered.toSet().size == source.numberOfPages) { "يجب تحديد جميع الصفحات مرة واحدة دون تكرار" }
+                                PDDocument().use { output ->
+                                    ordered.forEach { i -> output.importPage(source.getPage(i)) }
+                                    output.save(target)
+                                }
+                            }
+                            "reverse" -> PDDocument.load(File(inputs[0])).use { source ->
+                                PDDocument().use { output ->
+                                    for (i in source.numberOfPages - 1 downTo 0) {
+                                        output.importPage(source.getPage(i))
+                                    }
+                                    output.save(target)
+                                }
+                            }
+                            "text" -> PDDocument.load(File(inputs[0])).use { source ->
+                                val stripper = PDFTextStripper()
+                                val extracted = stripper.getText(source)
+                                require(extracted.isNotBlank()) { "لم يتم العثور على نص قابل للاستخراج؛ قد يحتاج الملف إلى OCR" }
+                                target.writeText(extracted, StandardCharsets.UTF_8)
                             }
                             "rotate" -> PDDocument.load(File(inputs[0])).use { source ->
                                 require(degrees in listOf(90,180,270)) { "زاوية التدوير غير صحيحة" }
