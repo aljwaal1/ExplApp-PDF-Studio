@@ -6,11 +6,20 @@ import com.tom_roush.pdfbox.multipdf.PDFMergerUtility
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.pdmodel.PDPage
 import com.tom_roush.pdfbox.text.PDFTextStripper
+import com.tom_roush.pdfbox.rendering.PDFRenderer
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
 import java.nio.charset.StandardCharsets
+import java.io.FileOutputStream
+import java.util.zip.ZipOutputStream
+import java.util.zip.ZipEntry
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import com.tom_roush.pdfbox.pdmodel.PDPageContentStream
+import com.tom_roush.pdfbox.pdmodel.common.PDRectangle
+import com.tom_roush.pdfbox.pdmodel.graphics.image.LosslessFactory
 
 class MainActivity : FlutterActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -28,6 +37,7 @@ class MainActivity : FlutterActivity() {
                 val dest = call.argument<String>("output") ?: ""
                 val pages = call.argument<String>("pages") ?: "1"
                 val degrees = call.argument<Int>("degrees") ?: 90
+                val query = call.argument<String>("query") ?: ""
                 Thread {
                     try {
                         require(inputs.isNotEmpty() && dest.isNotEmpty()) { "الملفات المطلوبة غير موجودة" }
@@ -77,6 +87,76 @@ class MainActivity : FlutterActivity() {
                                 val extracted = stripper.getText(source)
                                 require(extracted.isNotBlank()) { "لم يتم العثور على نص قابل للاستخراج؛ قد يحتاج الملف إلى OCR" }
                                 target.writeText(extracted, StandardCharsets.UTF_8)
+                            }
+                            "search" -> PDDocument.load(File(inputs[0])).use { source ->
+                                require(query.isNotBlank()) { "أدخل كلمة البحث" }
+                                val stripper = PDFTextStripper()
+                                val matches = mutableListOf<String>()
+                                for (p in 1..source.numberOfPages) {
+                                    stripper.startPage = p
+                                    stripper.endPage = p
+                                    val text = stripper.getText(source)
+                                    if (text.contains(query, ignoreCase = true)) {
+                                        matches.add("الصفحة $p: " + text.replace("\\s+".toRegex(), " ").take(300))
+                                    }
+                                }
+                                target.writeText(if (matches.isEmpty()) "لا توجد نتائج" else matches.joinToString("\\n\\n"), StandardCharsets.UTF_8)
+                            }
+                            "imagespdf" -> PDDocument().use { output ->
+                                for (file in inputs) {
+                                    val bitmap = BitmapFactory.decodeFile(file) ?: error("تعذر قراءة الصورة")
+                                    try {
+                                        // Fit each image on an A4 page, preserving aspect ratio.
+                                        val page = PDPage(PDRectangle.A4)
+                                        output.addPage(page)
+                                        val img = LosslessFactory.createFromImage(output, bitmap)
+                                        val scale = minOf((page.mediaBox.width - 40f) / bitmap.width, (page.mediaBox.height - 40f) / bitmap.height)
+                                        val w = bitmap.width * scale
+                                        val h = bitmap.height * scale
+                                        PDPageContentStream(output, page).use { stream ->
+                                            stream.drawImage(img, (page.mediaBox.width - w) / 2f, (page.mediaBox.height - h) / 2f, w, h)
+                                        }
+                                    } finally { bitmap.recycle() }
+                                }
+                                output.save(target)
+                            }
+                            "render" -> PDDocument.load(File(inputs[0])).use { source ->
+                                val renderer = PDFRenderer(source)
+                                ZipOutputStream(FileOutputStream(target)).use { zip ->
+                                    for (i in 0 until source.numberOfPages) {
+                                        val bitmap = renderer.renderImageWithDPI(i, 144f)
+                                        try {
+                                            zip.putNextEntry(ZipEntry("page-${i + 1}.png"))
+                                            bitmap.compress(Bitmap.CompressFormat.PNG, 100, zip)
+                                            zip.closeEntry()
+                                        } finally { bitmap.recycle() }
+                                    }
+                                }
+                            }
+                            "blank" -> PDDocument.load(File(inputs[0])).use { source ->
+                                // Rendered check detects image-only pages as nonblank; never trust missing text alone.
+                                val renderer = PDFRenderer(source)
+                                val blank = mutableListOf<Int>()
+                                for (i in 0 until source.numberOfPages) {
+                                    val bitmap = renderer.renderImageWithDPI(i, 48f)
+                                    try {
+                                        var colored = false
+                                        val step = 3
+                                        loop@ for (y in 0 until bitmap.height step step) {
+                                            for (x in 0 until bitmap.width step step) {
+                                                val c = bitmap.getPixel(x, y)
+                                                val r = android.graphics.Color.red(c)
+                                                val g = android.graphics.Color.green(c)
+                                                val b = android.graphics.Color.blue(c)
+                                                if (r < 245 || g < 245 || b < 245) { colored = true; break@loop }
+                                            }
+                                        }
+                                        if (!colored) blank.add(i)
+                                    } finally { bitmap.recycle() }
+                                }
+                                require(blank.size < source.numberOfPages) { "كل الصفحات تبدو فارغة؛ لن يتم حذفها جميعًا" }
+                                for (i in blank.asReversed()) source.removePage(i)
+                                source.save(target)
                             }
                             "rotate" -> PDDocument.load(File(inputs[0])).use { source ->
                                 require(degrees in listOf(90,180,270)) { "زاوية التدوير غير صحيحة" }

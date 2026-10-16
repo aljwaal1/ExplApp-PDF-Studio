@@ -34,14 +34,15 @@ class _StudioHomeState extends State<StudioHome> {
   String? error;
   final pages = TextEditingController(text: '1');
   final rotation = TextEditingController(text: '90');
+  final query = TextEditingController();
 
   @override
-  void dispose() {pages.dispose(); rotation.dispose(); super.dispose();}
+  void dispose() {pages.dispose(); rotation.dispose(); query.dispose(); super.dispose();}
 
   Future<void> pick() async {
     final picked = await FilePicker.platform.pickFiles(
-      type: FileType.custom, allowedExtensions: ['pdf'],
-      allowMultiple: mode == 'merge', withData: false,
+      type: FileType.custom, allowedExtensions: mode == 'imagespdf' ? ['png','jpg','jpeg'] : ['pdf'],
+      allowMultiple: mode == 'merge' || mode == 'imagespdf', withData: false,
     );
     if (picked == null) return;
     final paths = picked.files.map((f) => f.path).whereType<String>().toList();
@@ -54,12 +55,13 @@ class _StudioHomeState extends State<StudioHome> {
     setState(() {busy = true; result = null; error = null;});
     try {
       final folder = await getApplicationDocumentsDirectory();
-      final extension = mode == 'text' ? 'txt' : 'pdf';
+      final extension = (mode == 'text' || mode == 'search') ? 'txt' : mode == 'render' ? 'zip' : 'pdf';
       final name = 'ExplApp-${mode}-${DateTime.now().millisecondsSinceEpoch}.$extension';
       final path = '${folder.path}/$name';
       await channel.invokeMethod<void>('process', {
         'operation': mode, 'inputs': files, 'output': path,
         'pages': pages.text, 'degrees': int.tryParse(rotation.text) ?? 90,
+        'query': query.text,
       });
       if (!await File(path).exists()) throw Exception('لم ينتج الملف المتوقع');
       setState(()=>result=path);
@@ -80,6 +82,10 @@ class _StudioHomeState extends State<StudioHome> {
       ('reverse','عكس ترتيب الصفحات',Icons.swap_vert),
       ('reorder','إعادة ترتيب الصفحات',Icons.reorder),
       ('text','استخراج النص إلى TXT',Icons.text_snippet_outlined),
+      ('search','بحث نصي داخل PDF',Icons.search),
+      ('blank','حذف الصفحات البيضاء',Icons.layers_clear),
+      ('render','PDF إلى صور PNG',Icons.image_outlined),
+      ('imagespdf','صور إلى PDF',Icons.photo_library_outlined),
     ];
     return Scaffold(
       appBar: AppBar(title: const Text('ExplApp PDF Studio'),centerTitle:true),
@@ -99,9 +105,11 @@ class _StudioHomeState extends State<StudioHome> {
           onChanged:(v)=>setState(() {mode=v!;files.clear();result=null;error=null;}),
         ))),
         const SizedBox(height:12),
-        FilledButton.icon(onPressed:busy?null:pick,icon:const Icon(Icons.folder_open),label:Text(mode=='merge'?'اختيار ملفات PDF':'اختيار ملف PDF')),
+        FilledButton.icon(onPressed:busy?null:pick,icon:const Icon(Icons.folder_open),label:Text(mode=='imagespdf'?'اختيار الصور':mode=='merge'?'اختيار ملفات PDF':'اختيار ملف PDF')),
         ...files.map((f)=>ListTile(dense:true,leading:const Icon(Icons.picture_as_pdf),title:Text(f.split('/').last,maxLines:1,overflow:TextOverflow.ellipsis))),
         if (mode=='split' || mode=='delete' || mode=='reorder') TextField(controller:pages,decoration:InputDecoration(labelText:mode=='delete'?'الصفحات المراد حذفها':mode=='reorder'?'الترتيب الجديد لكل الصفحات':'الصفحات المراد استخراجها',helperText:mode=='reorder'?'مثال لملف من 4 صفحات: 3,1,4,2':'مثال: 1-3,5'),keyboardType:TextInputType.text),
+        if (mode=='search') TextField(controller:query,decoration:const InputDecoration(labelText:'الكلمة أو العبارة المراد البحث عنها')),
+        if (mode=='blank') const Padding(padding:EdgeInsets.symmetric(vertical:8),child:Text('سيُفحص محتوى الصفحات بصريًا بدقة منخفضة. تأكد من الملف الناتج قبل حذف الأصل.')),
         if (mode=='rotate') DropdownButtonFormField<String>(
           value: rotation.text,items:['90','180','270'].map((d)=>DropdownMenuItem(value:d,child:Text('$d درجة'))).toList(),
           onChanged:(v)=>setState(()=>rotation.text=v??'90'),decoration:const InputDecoration(labelText:'زاوية التدوير'),

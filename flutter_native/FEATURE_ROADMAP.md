@@ -9,17 +9,17 @@
 | 1 | Merge PDF | 0 | Native initial implementation; device QA required |
 | 2 | Extract/split PDF pages | 0 | Native initial implementation; device QA required |
 | 3 | Reorder and rotate PDF pages | 1 | Rotation implemented, arbitrary reorder pending |
-| 4 | Remove blank PDF pages | 2 | Pending |
+| 4 | Remove blank PDF pages | 2 | Implemented in PR #9; visual QA pending |
 | 5 | Watermark and page numbering | 2 | Pending |
 | 6 | PDF to TXT | 1 | Native initial implementation in PR #8 |
 | 7 | PDF to Markdown | 3 | Pending |
 | 8 | PDF to Word DOCX | 3 | Pending |
-| 9 | PDF to images | 2 | Pending |
-| 10 | Images to PDF | 2 | Pending |
+| 9 | PDF to images | 2 | Implemented in PR #9 (PNG ZIP); CI and device QA pending |
+| 10 | Images to PDF | 2 | Implemented in PR #9 (PNG/JPG to A4 PDF); CI and device QA pending |
 | 11 | PDF to HTML | 3 | Pending |
 | 12 | Table extraction Excel/CSV | 4 | Pending |
 | 13 | Arabic and English OCR | 4 | Pending; bundle language models for offline |
-| 14 | Search in PDF | 2 | Pending |
+| 14 | Search in PDF | 2 | Implemented in PR #9 (text search to TXT); CI/device QA pending |
 | 15 | Compare two PDF documents | 4 | Pending |
 | 16 | Detect/extract book chapters | 5 | Pending |
 | 17 | Batch processing | 5 | Pending |
