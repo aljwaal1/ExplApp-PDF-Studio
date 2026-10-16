@@ -97,7 +97,7 @@ class MainActivity : FlutterActivity() {
                                     stripper.endPage = p
                                     val text = stripper.getText(source)
                                     if (text.contains(query, ignoreCase = true)) {
-                                        matches.add("الصفحة $p: " + text.replace("\s+".toRegex(), " ").take(300))
+                                        matches.add("الصفحة $p: " + text.replace("\\s+".toRegex(), " ").take(300))
                                     }
                                 }
                                 target.writeText(if (matches.isEmpty()) "لا توجد نتائج" else matches.joinToString("\n\n"), StandardCharsets.UTF_8)
