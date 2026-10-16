@@ -97,7 +97,7 @@ class MainActivity : FlutterActivity() {
                                     stripper.endPage = p
                                     val text = stripper.getText(source)
                                     if (text.contains(query, ignoreCase = true)) {
-                                        matches.add("الصفحة $p: " + text.replace("\s+".toRegex(), " ").take(300))
+                                        matches.add("الصفحة $p: " + text.replace("\\s+".toRegex(), " ").take(300))
                                     }
                                 }
                                 target.writeText(if (matches.isEmpty()) "لا توجد نتائج" else matches.joinToString("\n\n"), StandardCharsets.UTF_8)
@@ -214,7 +214,7 @@ class MainActivity : FlutterActivity() {
                             }
                             "chapters" -> PDDocument.load(File(inputs[0])).use { source ->
                                 val extractor = PDFTextStripper()
-                                val heading = Regex("^(?:الفصل|الباب|الوحدة|القسم|الدرس|chapter|section|part|unit)\b", RegexOption.IGNORE_CASE)
+                                val heading = Regex("^(?:الفصل|الباب|الوحدة|القسم|الدرس|chapter|section|part|unit)\\b", RegexOption.IGNORE_CASE)
                                 val rows = mutableListOf("page,title")
                                 for (i in 1..source.numberOfPages) {
                                     extractor.startPage = i
@@ -227,8 +227,8 @@ class MainActivity : FlutterActivity() {
                             }
                             "tables" -> PDDocument.load(File(inputs[0])).use { source ->
                                 val text = PDFTextStripper().getText(source)
-                                val rows = text.lines().map { it.trim() }.filter { it.contains(Regex("\s{2,}|\t")) }.map { line ->
-                                    line.split(Regex("\s{2,}|\t")).joinToString(",") { csv(it) }
+                                val rows = text.lines().map { it.trim() }.filter { it.contains(Regex("\\s{2,}|\t")) }.map { line ->
+                                    line.split(Regex("\\s{2,}|\t")).joinToString(",") { csv(it) }
                                 }
                                 require(rows.isNotEmpty()) { "لا توجد صفوف قابلة للتقسيم؛ يلزم استخراج جداول متقدم أو OCR" }
                                 target.writeText(rows.joinToString("\n"), StandardCharsets.UTF_8)
